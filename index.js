@@ -4,7 +4,8 @@ const electron = require("electron");
 // Known issues: https://playwright.dev/docs/api/class-electron
 flipFuses(electron, {
   version: FuseVersion.V1,
-  [FuseV1Options.EnableNodeCliInspectArguments]: true,
+  [FuseV1Options.EnableNodeCliInspectArguments]: undefined,
+  [FuseV1Options.RunAsNode]: undefined,
 });
 
 require("./main");

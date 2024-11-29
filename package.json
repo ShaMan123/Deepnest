@@ -35,6 +35,7 @@
     "shx": "^0.3.4"
   },
   "dependencies": {
+    "@electron/fuses": "^1.8.0",
     "electron-settings": "^4.0.2",
     "electron-window-manager": "^1.0.6",
     "graceful-fs": "^4.2.11",

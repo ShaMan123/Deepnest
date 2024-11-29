@@ -29,7 +29,7 @@ const sheet = { width: 300, height: 300 };
 
 test("Nest", async ({}) => {
   const electronApp = await electron.launch({
-    args: ["main.js"],
+    args: ["index.js"],
     env: { SAVE_PLACEMENTS_PATH: `${test.info().outputPath("nesting")}/` },
   });
 

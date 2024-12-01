@@ -1,7 +1,14 @@
-import { _electron as electron, expect, test } from "@playwright/test";
+import {
+  ConsoleMessage,
+  _electron as electron,
+  expect,
+  test,
+} from "@playwright/test";
 import { OpenDialogReturnValue } from "electron";
+import { appendFileSync } from "fs";
 import { readdir, readFile } from "fs/promises";
 import path from "path";
+import { fileURLToPath } from "url";
 
 type NestingResult = {
   area: number;
@@ -38,10 +45,43 @@ test("Nest", async ({}) => {
   const window = await electronApp.firstWindow();
 
   // Direct Electron console to Node terminal.
-  window.on("console", console.log);
+  const logMessage = async (message: ConsoleMessage) => {
+    const { url, lineNumber, columnNumber } = message.location();
+    let file = url;
+    try {
+      file = path.relative(process.cwd(), fileURLToPath(url));
+    } catch (error) {}
+    console.log({
+      location: `${file}:${lineNumber}:${columnNumber}`,
+      args: await Promise.all(message.args().map((x) => x.jsonValue())),
+      type: message.type(),
+    });
+  };
+  // window.on("console", logMessage);
+  // electronApp.on("window", (win) => win.on("console", logMessage));
 
   await test.step("upload and start", async () => {
-    electronApp.evaluate(
+    // electronApp.evaluate(
+    //   (q, { upload, download }) => {
+    //     console.log(q);
+    //     q.contextBridge.exposeInMainWorld("electron", {
+    //       showOpenDialog: async (): Promise<OpenDialogReturnValue> => ({
+    //         filePaths: upload,
+    //         canceled: false,
+    //       }),
+    //       showSaveDialogSync: () => download,
+    //     });
+    //   },
+    //   {
+    //     upload: [
+    //       path.resolve(__dirname, "letters.svg"),
+    //       path.resolve(__dirname, "letters2.svg"),
+    //     ],
+    //     download: downloadPath,
+    //   }
+    // );
+
+    await electronApp.evaluate(
       ({ dialog }, paths) => {
         dialog.showOpenDialog = async (): Promise<OpenDialogReturnValue> => ({
           filePaths: paths,
@@ -125,10 +165,13 @@ test("Nest", async ({}) => {
 
   // await window.pause();
   await expect(window.locator("id=progressbar")).toBeVisible();
-  await expect(window.locator("id=nestinfo").locator('h1').nth(0)).toHaveText('1');
-  await expect(window.locator("id=nestinfo").locator('h1').nth(1)).toHaveText('54/54');
   await waitForIteration(1);
-
+  await expect(window.locator("id=nestinfo").locator("h1").nth(0)).toHaveText(
+    "1"
+  );
+  await expect(window.locator("id=nestinfo").locator("h1").nth(1)).toHaveText(
+    "54/54"
+  );
 
   const svg = await downloadSvg();
 
@@ -155,7 +198,6 @@ test.afterAll(async () => {
     (
       await readdir(outputDir)
     ).map((file) => {
-      console.log(file);
       return test.info().attach(file, {
         path: path.resolve(outputDir, file),
       });

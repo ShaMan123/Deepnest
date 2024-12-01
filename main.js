@@ -177,8 +177,6 @@ function createBackgroundWindows() {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
-  // https://www.electronjs.org/docs/latest/breaking-changes#planned-breaking-api-changes-90
-  app.allowRendererProcessReuse = false;
 	createMainWindow();
 	mainWindow.once('ready-to-show', () => {
 	  mainWindow.show();

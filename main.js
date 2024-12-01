@@ -99,7 +99,7 @@ function createMainWindow() {
       contextIsolation: false,
       enableRemoteModule: true,      
       nodeIntegration: true,
-      nativeWindowOpen: false
+      nativeWindowOpen: true
     }
   })
 
@@ -148,7 +148,7 @@ function createBackgroundWindows() {
         contextIsolation: false,
         enableRemoteModule: true,
         nodeIntegration: true,
-        nativeWindowOpen: false
+        nativeWindowOpen: true
       }
 		});
 

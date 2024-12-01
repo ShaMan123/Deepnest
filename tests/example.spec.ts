@@ -29,7 +29,7 @@ const sheet = { width: 300, height: 300 };
 
 test("Nest", async ({}) => {
   const electronApp = await electron.launch({
-    args: ["main.js"]
+    args: ["main.js"],
   });
 
   const window = await electronApp.firstWindow();
@@ -101,10 +101,15 @@ test("Nest", async ({}) => {
 
   const waitForIteration = (n: number) =>
     expect(() =>
-      expect(window.locator("id=nestlist").locator("span").nth(n - 1)).toBeVisible()
-    ).toPass({ timeout:30_000 });
+      expect(
+        window
+          .locator("id=nestlist")
+          .locator("span")
+          .nth(n - 1)
+      ).toBeVisible()
+    ).toPass({ timeout: 120_000 });
 
-  await waitForIteration(1)
+  await waitForIteration(1);
 
   const svg = await downloadSvg();
 

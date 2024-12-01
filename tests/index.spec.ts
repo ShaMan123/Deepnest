@@ -125,10 +125,10 @@ test("Nest", async ({}) => {
 
   // await window.pause();
   await expect(window.locator("id=progressbar")).toBeVisible();
-  await expect(window).toHaveScreenshot("status.png", {
-    clip: { x: 0, y: 0, width: 150, height: 250 },
-  });
+  await expect(window.locator("id=nestinfo").locator('h1').nth(0)).toHaveText('1');
+  await expect(window.locator("id=nestinfo").locator('h1').nth(1)).toHaveText('54/54');
   await waitForIteration(1);
+
 
   const svg = await downloadSvg();
 

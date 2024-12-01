@@ -2,6 +2,8 @@ const electron = require('electron')
 const { Menu, ipcMain } = electron
 const fs = require('graceful-fs');
 
+require('@electron/remote/main').initialize()
+
 // Module to control application life.
 const app = electron.app
 
@@ -96,9 +98,12 @@ function createMainWindow() {
     webPreferences: {
       contextIsolation: false,
       enableRemoteModule: true,      
-      nodeIntegration: true
+      nodeIntegration: true,
+      nativeWindowOpen: true
     }
   })
+
+  require('@electron/remote/main').enable(mainWindow.webContents)
 
   // and load the index.html of the app.
   mainWindow.loadURL(url.format({
@@ -142,9 +147,12 @@ function createBackgroundWindows() {
       webPreferences: {
         contextIsolation: false,
         enableRemoteModule: true,
-        nodeIntegration: true
+        nodeIntegration: true,
+        nativeWindowOpen: true
       }
 		});
+
+    require('@electron/remote/main').enable(back.webContents)
 		
     if (process.env["deepnest_debug"] === '1') 
 		  back.webContents.openDevTools();

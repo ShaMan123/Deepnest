@@ -6,6 +6,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
+    "test": "playwright test --headed",
     "configure": "node-gyp configure --release",
     "build-all": "node-gyp rebuild && mkdir minkowski >nul 2>&1|echo . >nul && npm run build",
     "build": "mkdir minkowski >nul 2>&1|echo . >nul && mkdir minkowski/Release >nul 2>&1|echo . >nul &&  electron-rebuild && npm run copy",
@@ -30,13 +31,14 @@
     "@electron/rebuild": "^3.2.9",
     "@playwright/test": "^1.50.0-alpha-2024-11-29",
     "@types/node": "^22.10.1",
-    "electron": "^13.0.0",
+    "electron": "^13.6.9",
     "electron-packager": "^17.1.1",
     "shx": "^0.3.4"
   },
   "dependencies": {
     "@electron/fuses": "^1.8.0",
-    "electron-settings": "^4.0.2",
+    "@electron/remote": "^2.1.2",
+    "electron-settings": "^4.0.4",
     "electron-window-manager": "^1.0.6",
     "graceful-fs": "^4.2.11",
     "nan": "^2.17.0",

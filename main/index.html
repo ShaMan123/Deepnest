@@ -32,7 +32,8 @@
 			}
 		}
 		
-		const { ipcRenderer, remote } = require('electron');
+		const { ipcRenderer } = require('electron');
+		const remote = require('@electron/remote');
 		const fs = require('graceful-fs');
 		const request = require('request');
 		const http = require('http');
@@ -66,8 +67,9 @@
 			});
 			
 			// config form
-			const config = require('electron-settings');
-			window.config = config;
+			
+
+			const defaultConversionServer = 'http://convert.deepnest.io';
 			
 			var defaultconfig = {
 			  units: 'inch',
@@ -85,19 +87,41 @@
 			  dxfImportScale: "1",
 			  dxfExportScale: "72",
 			  endpointTolerance: 0.36,
-			  conversionServer: 'http://convert.deepnest.io'
+			  conversionServer: defaultConversionServer
 			};
+
+			const config = {
+				...defaultconfig,
+				getSync(k){
+					return typeof k==='undefined'? this: this[k];
+				},
+				setSync(arg0, v){
+					if(typeof arg0 === 'object') {
+						for (const key in arg0) {
+							this[key] = arg0[key];
+						}
+					} else if(typeof arg0 === 'string'){
+						this[arg0] = v;
+					}
+				},
+				resetToDefaultsSync(){
+					for (const key in defaultconfig) {
+						this.setSync(key, defaultconfig[key])
+					}
+				}
+			}
 			
+			window.config = config;
 			//config.defaults(defaultconfig);
 			
-			const defaultConversionServer = 'http://convert.deepnest.io';
+			
 			
 			// set to default if not set (for people with old configs stored)
-			for (var key in defaultconfig) {
-			  if(typeof config.getSync(key) === 'undefined'){
-			  	config.setSync(key, defaultconfig[key]);
-			  }
-			}
+			// for (var key in defaultconfig) {
+			//   if(typeof config.getSync(key) === 'undefined'){
+			//   	config.setSync(key, defaultconfig[key]);
+			//   }
+			// }
 			
 			var cfgvalues = config.getSync();
 			window.DeepNest.config(cfgvalues);
@@ -559,8 +583,7 @@
 			}
 			
 			// file import
-			var electron = require('electron');
-			var app = electron.remote; 
+			var app = require('@electron/remote');
 			var fs = require('fs');
 
 			var files = fs.readdirSync(remote.getGlobal('NEST_DIRECTORY'));
@@ -800,7 +823,7 @@
 				nestwindow.setAlwaysOnTop(true);
 				nestwindow.open();*/
 				
-				//const remote = require('electron').remote;
+				//const remote = require('@electron/remote');
 				
 				/*window.nestwindow = new BrowserWindow({width: window.outerWidth*0.8, height: window.outerHeight*0.8, frame: true});
 				
@@ -1043,8 +1066,7 @@
 			
 			var exportdxf = document.querySelector('#exportdxf');
 			exportdxf.onclick = function(){
-//				var electron = require('electron');
-//				var app = electron.remote; 				
+//				var app = require('@electron/remote');		
 				var dialog = app.dialog;
 				var fileName = dialog.showSaveDialogSync({
 					title: 'Export Deepnest DXF'

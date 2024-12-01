@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "test": "playwright test --headed",
+    "test": "playwright test",
     "configure": "node-gyp configure --release",
     "build-all": "node-gyp rebuild && mkdir minkowski >nul 2>&1|echo . >nul && npm run build",
     "build": "mkdir minkowski >nul 2>&1|echo . >nul && mkdir minkowski/Release >nul 2>&1|echo . >nul &&  electron-rebuild && npm run copy",

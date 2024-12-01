@@ -99,14 +99,12 @@ test("Nest", async ({}) => {
   //   );
   // });
 
-  const waitForIteration = () =>
-    expect((n: number) =>
-      expect(window.locator("id=nestlist").locator("span")).toHaveCount(n)
-    ).toPass();
+  const waitForIteration = (n: number) =>
+    expect(() =>
+      expect(window.locator("id=nestlist").locator("span").nth(n - 1)).toBeVisible()
+    ).toPass({ timeout:30_000 });
 
-  await expect(() =>
-    expect(window.locator("id=nestlist").locator("span")).not.toHaveCount(0)
-  ).toPass();
+  await waitForIteration(1)
 
   const svg = await downloadSvg();
 

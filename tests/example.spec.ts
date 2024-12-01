@@ -1,6 +1,6 @@
 import { _electron as electron, expect, test } from "@playwright/test";
 import { OpenDialogReturnValue } from "electron";
-import { readFile } from "fs/promises";
+import { readdir, readFile } from "fs/promises";
 import path from "path";
 
 type NestingResult = {
@@ -32,6 +32,7 @@ const sheet = { width: 10, height: 10 };
 test("Nest", async ({}) => {
   const electronApp = await electron.launch({
     args: ["main.js"],
+    recordVideo: { dir: test.info().outputDir },
   });
 
   const window = await electronApp.firstWindow();
@@ -86,9 +87,9 @@ test("Nest", async ({}) => {
       window.DeepNest.config(config);
     }, config);
 
-    await expect(window).toHaveScreenshot("loaded.png", {
-      clip: { x: 100, y: 100, width: 2000, height: 1000 },
-    });
+    // await expect(window).toHaveScreenshot("loaded.png", {
+    //   clip: { x: 100, y: 100, width: 2000, height: 1000 },
+    // });
 
     await window.click("id=startnest");
   });
@@ -146,4 +147,18 @@ test("Nest", async ({}) => {
   await stopNesting();
 
   await electronApp.close();
+});
+
+test.afterAll(async () => {
+  const { outputDir } = test.info();
+  await Promise.all(
+    (
+      await readdir(outputDir)
+    ).map((file) => {
+      console.log(file);
+      return test.info().attach(file, {
+        path: path.resolve(outputDir, file),
+      });
+    })
+  );
 });

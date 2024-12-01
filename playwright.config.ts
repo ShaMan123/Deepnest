@@ -35,6 +35,8 @@ export default defineConfig({
     headless: false,
   },
 
+  snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}{ext}",
+
   /* Configure projects for major browsers */
   projects: [
     {

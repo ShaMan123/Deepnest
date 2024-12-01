@@ -25,6 +25,8 @@ type NestingResult = {
 
 // test.use({ launchOptions: { slowMo: !process.env.CI ? 500 : 0 } });
 
+test.setTimeout(120_000);
+
 const sheet = { width: 10, height: 10 };
 
 test("Nest", async ({}) => {
@@ -35,7 +37,7 @@ test("Nest", async ({}) => {
   const window = await electronApp.firstWindow();
 
   // Direct Electron console to Node terminal.
-  // window.on("console", console.log);
+  window.on("console", console.log);
 
   await test.step("upload and start", async () => {
     electronApp.evaluate(
@@ -57,27 +59,36 @@ test("Nest", async ({}) => {
     await window.fill("id=sheetheight", sheet.height.toString());
     await window.click("id=confirmsheet");
 
-    await window.evaluate(() =>
-      // TODO: Verify this works
-      window.DeepNest.config({
-        units: "mm",
-        scale: 72, // actual stored value will be in units/inch
-        spacing: 0,
-        curveTolerance: 0.72, // store distances in native units
-        rotations: 4,
-        threads: 4,
-        populationSize: 10,
-        mutationRate: 10,
-        placementType: "gravity", // how to place each part (possible values gravity, box, convexhull)
-        mergeLines: true, // whether to merge lines
-        timeRatio: 0.5, // ratio of material reduction to laser time. 0 = optimize material only, 1 = optimize laser time only
-        simplify: false,
-        dxfImportScale: "1",
-        dxfExportScale: "72",
-        endpointTolerance: 0.36,
-        conversionServer: "http://convert.deepnest.io",
-      })
-    );
+    const spacingMM = 4;
+    const scale = 72;
+    const config = {
+      units: "mm",
+      scale, // stored value will be in units/inch
+      spacing: (spacingMM / 25.4) * scale, // stored value will be in units/inch
+      curveTolerance: 0.72, // store distances in native units
+      clipperScale: 10000000,
+      rotations: 4,
+      threads: 4,
+      populationSize: 10,
+      mutationRate: 10,
+      placementType: "gravity", // how to place each part (possible values gravity, box, convexhull)
+      mergeLines: true, // whether to merge lines
+      timeRatio: 0.5, // ratio of material reduction to laser time. 0 = optimize material only, 1 = optimize laser time only
+      simplify: false,
+      dxfImportScale: "1",
+      dxfExportScale: "72",
+      endpointTolerance: 0.36,
+      conversionServer: "http://convert.deepnest.io",
+    };
+
+    await window.evaluate((config) => {
+      window.config.setSync(config);
+      window.DeepNest.config(config);
+    }, config);
+
+    await expect(window).toHaveScreenshot("loaded.png", {
+      clip: { x: 100, y: 100, width: 2000, height: 1000 },
+    });
 
     await window.click("id=startnest");
   });
@@ -89,6 +100,8 @@ test("Nest", async ({}) => {
     electronApp.evaluate(({ dialog }, path) => {
       dialog.showSaveDialogSync = () => path;
     }, file);
+    await window.click("id=export");
+    await expect(window.locator("id=exportsvg")).toBeVisible();
     await window.click("id=exportsvg");
     return (await readFile(file)).toString();
   };
@@ -107,8 +120,13 @@ test("Nest", async ({}) => {
           .locator("span")
           .nth(n - 1)
       ).toBeVisible()
-    ).toPass({ timeout: 120_000 });
+    ).toPass();
 
+  // await window.pause();
+  await expect(window.locator("id=progressbar")).toBeVisible();
+  await expect(window).toHaveScreenshot("status.png", {
+    clip: { x: 0, y: 0, width: 150, height: 250 },
+  });
   await waitForIteration(1);
 
   const svg = await downloadSvg();

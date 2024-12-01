@@ -25,7 +25,7 @@ type NestingResult = {
 
 // test.use({ launchOptions: { slowMo: !process.env.CI ? 500 : 0 } });
 
-const sheet = { width: 300, height: 300 };
+const sheet = { width: 10, height: 10 };
 
 test("Nest", async ({}) => {
   const electronApp = await electron.launch({

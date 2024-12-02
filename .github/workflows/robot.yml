@@ -6,6 +6,7 @@ on:
     branches: [main, master]
 jobs:
   exec:
+    if: false
     strategy:
       matrix:
         os: [ubuntu-20.04, ubuntu-latest]

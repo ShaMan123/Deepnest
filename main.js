@@ -147,7 +147,7 @@ function createBackgroundWindows() {
 
     require('@electron/remote/main').enable(back.webContents)
 		
-    if (process.env["deepnest_debug"] === '1' || process.env.CI) 
+    if (process.env["deepnest_debug"] === '1') 
 		  back.webContents.openDevTools();
 		
 		back.loadURL(url.format({

@@ -12,9 +12,9 @@ jobs:
   build:
     strategy:
       matrix:
-        # node-version: [20.x, lts]
-        # os: [windows-2022, ubuntu-22.04, ubuntu-latest]
+        # os: [windows-2022, ubuntu-latest]
         os: [ubuntu-latest]
+        flavor: [test, prod]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -35,14 +35,16 @@ jobs:
         # node-version: ${{ matrix.node-version }}
 
       - name: Change entry point
+        if: matrix.flavor == 'test'
         run: |
           json=$(node -p "JSON.stringify({...require('./package.json'), main: 'main.test.js' }, null, 2)")
           echo $json > package.json
 
       - name: Build
         run: |
-          npm install
+          npm ci
           npm run build
+
       - name: Package
         run: |
           npx @electron/packager . deepnest --out dist
@@ -50,12 +52,12 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.os }}
+          name: dist-${{ matrix.flavor }}-${{ matrix.os }}
           path: dist/
           retention-days: 1
 
       - name: Run app
-        if: startsWith(matrix.os, 'ubuntu')
+        if: matrix.flavor == 'test'
         run: |
           appName=$(ls dist | head -1)
           # copy input files
@@ -65,6 +67,7 @@ jobs:
           xvfb-run ./dist/$appName/deepnest
 
       - name: Upload results
+        if: matrix.flavor == 'test'
         uses: actions/upload-artifact@v4
         with:
           name: nesting-results-${{ matrix.os }}

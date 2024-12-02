@@ -12,8 +12,9 @@ jobs:
   build:
     strategy:
       matrix:
-        node-version: [20.x, latest]
-        os: [windows-2022, ubuntu-22.04, ubuntu-latest]
+        # node-version: [20.x, lts]
+        # os: [windows-2022, ubuntu-22.04, ubuntu-latest]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -29,10 +30,9 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu')
         run: sudo apt-get update && sudo apt-get install -yq libboost-dev
 
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
+      - uses: actions/setup-node@v4
+        # with:
+        # node-version: ${{ matrix.node-version }}
 
       - name: Build
         run: |
@@ -45,7 +45,7 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.os }}/${{ matrix.node-version }}
+          name: release-${{ matrix.os }}
           path: dist/
           retention-days: 1
 
@@ -54,11 +54,11 @@ jobs:
         run: |
           appName=$(ls dist | head -1)
           chmod +x ./dist/$appName/deepnest
-          ./dist/$appName/deepnest
+          xvfb-run ./dist/$appName/deepnest
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: nesting-results-${{ matrix.os }}/${{ matrix.node-version }}
+          name: nesting-results-${{ matrix.os }}
           path: ~/Downloads/nesting-*
           retention-days: 1

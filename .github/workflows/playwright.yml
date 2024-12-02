@@ -8,17 +8,17 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-latest]
+        os: [ubuntu-20.04, ubuntu-latest]
     timeout-minutes: 5
     runs-on: ${{ matrix.os }}
     steps:
-      # - name: boost
-      #   run: sudo apt-get update && sudo apt-get install -yq libboost-dev
+      - name: boost
+        run: sudo apt-get update && sudo apt-get install -yq libboost-dev
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 14
-      - run: npm i -g npm@8
+      #   with:
+      #     node-version: 14
+      # - run: npm i -g npm@8
       - name: Install dependencies
         run: npm ci
       - name: Install Playwright Browsers

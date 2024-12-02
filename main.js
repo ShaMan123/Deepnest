@@ -87,7 +87,7 @@ function createMainWindow() {
     width: Math.ceil(width*0.9), 
     height: Math.ceil(height*0.9), 
     frame: !frameless, 
-    show: false,
+    show: !!process.env.CI,
     webPreferences: {
       contextIsolation: false,
       enableRemoteModule: true,      
@@ -136,7 +136,7 @@ function createBackgroundWindows() {
 	// used to have 8, now just 1 background window
 	if(winCount < 1){
 		var back = new BrowserWindow({
-      show: false,
+      show: !!process.env.CI,
       webPreferences: {
         contextIsolation: false,
         enableRemoteModule: true,
@@ -172,9 +172,10 @@ function createBackgroundWindows() {
 app.on('ready', () => {
 	createMainWindow();
 	mainWindow.once('ready-to-show', () => {
-	  mainWindow.show();
+	  !process.env.CI &&  mainWindow.show();
 	  createBackgroundWindows();
 	})
+  app.emit('main-window', { mainWindow });
 	mainWindow.on('closed', () => {
 	  app.quit();
 	});

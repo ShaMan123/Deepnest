@@ -1,11 +1,10 @@
 import {
-  ConsoleMessage,
+  type ConsoleMessage,
   _electron as electron,
   expect,
   test,
 } from "@playwright/test";
 import { OpenDialogReturnValue } from "electron";
-import { appendFileSync } from "fs";
 import { readdir, readFile } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -36,10 +35,10 @@ test.setTimeout(120_000);
 
 const sheet = { width: 10, height: 10 };
 
-test("Nest", async ({}) => {
+test("Nest", async ({}, testInfo) => {
   const electronApp = await electron.launch({
     args: ["main.js"],
-    recordVideo: { dir: test.info().outputDir },
+    recordVideo: { dir: testInfo.outputDir },
   });
 
   const window = await electronApp.firstWindow();
@@ -137,7 +136,7 @@ test("Nest", async ({}) => {
   const stopNesting = () => window.click("id=stopnest");
 
   const downloadSvg = async () => {
-    const file = test.info().outputPath("output.svg");
+    const file = testInfo.outputPath("output.svg");
     electronApp.evaluate(({ dialog }, path) => {
       dialog.showSaveDialogSync = () => path;
     }, file);
@@ -153,19 +152,26 @@ test("Nest", async ({}) => {
   //   );
   // });
 
-  const waitForIteration = (n: number) =>
-    expect(() =>
-      expect(
-        window
-          .locator("id=nestlist")
-          .locator("span")
-          .nth(n - 1)
-      ).toBeVisible()
-    ).toPass();
+  // const waitForIteration = (n: number) =>
+  //   expect(() =>
+  //     expect(
+  //       window
+  //         .locator("id=nestlist")
+  //         .locator("span")
+  //         .nth(n - 1)
+  //     ).toBeVisible()
+  //   ).toPass();
 
-  await window.pause();
+  // await window.pause();
+
   await expect(window.locator("id=progressbar")).toBeVisible();
-  await waitForIteration(1);
+  const n = 1;
+  await expect(
+    window
+      .locator("id=nestlist")
+      .locator("span")
+      .nth(n - 1)
+  ).toBeVisible({ timeout: 60_000 });
   await expect(window.locator("id=nestinfo").locator("h1").nth(0)).toHaveText(
     "1"
   );
@@ -178,11 +184,9 @@ test("Nest", async ({}) => {
   const data = (): Promise<NestingResult> =>
     window.evaluate(() => window.DeepNest.nests);
 
-  test
-    .info()
-    .attach("nesting.svg", { body: svg, contentType: "image/svg+xml" });
+  testInfo.attach("nesting.svg", { body: svg, contentType: "image/svg+xml" });
 
-  test.info().attach("nesting.json", {
+  testInfo.attach("nesting.json", {
     body: JSON.stringify(await data(), null, 2),
     contentType: "application/json",
   });
@@ -192,13 +196,13 @@ test("Nest", async ({}) => {
   await electronApp.close();
 });
 
-test.afterAll(async () => {
-  const { outputDir } = test.info();
+test.afterAll(async ({}, testInfo) => {
+  const { outputDir } = testInfo;
   await Promise.all(
     (
       await readdir(outputDir)
     ).map((file) => {
-      return test.info().attach(file, {
+      return testInfo.attach(file, {
         path: path.resolve(outputDir, file),
       });
     })

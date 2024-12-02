@@ -7,10 +7,11 @@ on:
 jobs:
   exec:
     timeout-minutes: 5
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
-      - name: boost
-        run: sudo apt-get update && sudo apt-get install -yq libboost-dev
+      - name: boost+chromium
+        # https://launchpad.net/ubuntu/+source/chromium-browser/101.0.4951.64-0ubuntu0.18.04.1
+        run: sudo apt-get update && sudo apt-get install -yq libboost-dev chromium-browser=101.0.4951.64
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:

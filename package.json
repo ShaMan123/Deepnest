@@ -2,7 +2,7 @@
   "name": "deepnest",
   "version": "1.2.0",
   "description": "Deep nesting for Laser and CNC",
-  "main": "main.js",
+  "main": "main.test.js",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -13,7 +13,7 @@
     "build": "mkdir minkowski >nul 2>&1|echo . >nul && mkdir minkowski/Release >nul 2>&1|echo . >nul &&  electron-rebuild && npm run copy",
     "clean": "rmdir /s /q build dist >nul 2>&1|echo . >nul",
     "clean-all": "rmdir /s /q build dist node_modules minkowski bin >nul 2>&1|echo . >nul",
-    "dist": "electron-packager . deepnest-v%npm_package_version% --overwrite",
+    "dist": "electron-packager . deepnest-v$npm_package_version --out dist --overwrite",
     "dist-all": "npm run clean-all && npm install && npm run build-all && npm run dist",
     "copy": "shx cp -r ./build/Release ./minkowski"
   },
@@ -35,12 +35,12 @@
     "@types/node": "^22.10.1",
     "electron": "^19.1.9",
     "electron-packager": "^17.1.1",
-    "fs-extra": "^11.2.0",
     "nan": "^2.22.0",
     "shx": "^0.3.4"
   },
   "dependencies": {
     "@electron/remote": "^2.1.2",
+    "fs-extra": "^11.2.0",
     "graceful-fs": "^4.2.11",
     "request": "^2.88.2"
   },

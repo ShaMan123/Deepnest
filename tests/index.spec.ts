@@ -74,8 +74,8 @@ test("Nest", async ({}, testInfo) => {
     //   },
     //   {
     //     upload: [
-    //       path.resolve(__dirname, "letters.svg"),
-    //       path.resolve(__dirname, "letters2.svg"),
+    //       path.resolve(process.cwd(), "input", "letters.svg"),
+    //       path.resolve(process.cwd(), "input", "letters2.svg"),
     //     ],
     //     download: downloadPath,
     //   }
@@ -89,9 +89,9 @@ test("Nest", async ({}, testInfo) => {
         });
       },
       [
-        path.resolve(__dirname, "letters.svg"),
-        path.resolve(__dirname, "letters2.svg"),
-        path.resolve(__dirname, "letters3.svg"),
+        path.resolve(process.cwd(), "input", "letters.svg"),
+        path.resolve(process.cwd(), "input", "letters2.svg"),
+        path.resolve(process.cwd(), "input", "letters3.svg"),
       ]
     );
     await window.click("id=import");

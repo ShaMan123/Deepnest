@@ -1,7 +1,7 @@
 // const { flipFuses, FuseVersion, FuseV1Options } = require("@electron/fuses");
 const { app, dialog } = require("electron");
 const path = require("path");
-const { readFile, writeFile } = require("fs/promises");
+const { readFile, writeFile, readdir } = require("fs/promises");
 const { ensureDirSync } = require("fs-extra");
 
 // Known issues: https://playwright.dev/docs/api/class-electron
@@ -11,19 +11,20 @@ const { ensureDirSync } = require("fs-extra");
 //   [FuseV1Options.RunAsNode]: undefined,
 // });
 
-const inputDir = path.resolve(__dirname, "tests");
+const inputDir = path.resolve(__dirname, "input");
 const outputDir = path.resolve(__dirname, "test-results", "output");
 ensureDirSync(outputDir);
 const downloadFile = path.resolve(outputDir, "result.svg");
 
 const exec = async () => {
+  const files = (await readdir(inputDir))
+    .filter((file) => path.extname(file) === ".svg")
+    .map((file) => path.resolve(inputDir, file));
+
   const { data, svg } = await new Promise((resolve) => {
     dialog.showOpenDialog = async () => {
       return {
-        filePaths: [
-          path.resolve(inputDir, "letters.svg"),
-          path.resolve(inputDir, "letters2.svg"),
-        ],
+        filePaths: files,
         canceled: false,
       };
     };
@@ -32,7 +33,7 @@ const exec = async () => {
 
     app.on("main-window", async ({ mainWindow }) => {
       const data = await mainWindow.webContents.executeJavaScript(
-        (await readFile(path.resolve(inputDir, "robot.js"))).toString(),
+        (await readFile(path.resolve(__dirname, "robot.js"))).toString(),
         true
       );
 

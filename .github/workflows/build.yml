@@ -59,7 +59,7 @@ jobs:
         run: |
           appName=$(ls dist | head -1)
           # copy input files
-          cp -R ./input ./dist/$appName/resources/app
+          # cp -R ./input ./dist/$appName/resources/app
           # make executable and run
           chmod +x ./dist/$appName/deepnest
           xvfb-run ./dist/$appName/deepnest

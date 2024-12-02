@@ -3,42 +3,62 @@ name: build
 on:
   push:
     # enable next line to limit branches to run
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
     # enable next line to limit branches to run
     # branches: [ "master" ]
 
 jobs:
   build:
-    if: false
     strategy:
       matrix:
-        node-version: [14.x, 16.x, 18.x, 20.x]
-        os: [windows-2022, ubuntu-22.04]
+        node-version: [20.x, latest]
+        os: [windows-2022, ubuntu-22.04, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: recursive
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-#    not needed currently, but leaving here for future use
-#    - uses: actions/setup-python@v4
-#      with:
-#        python-version: '2.7.18'     
+      #    not needed currently, but leaving here for future use
+      #    - uses: actions/setup-python@v4
+      #      with:
+      #        python-version: '2.7.18'
 
-    - name: boost
-      if: startsWith(matrix.os,'ubuntu')
-      run: sudo apt-get update && sudo apt-get install -yq libboost-dev
-      
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
+      - name: boost
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get update && sudo apt-get install -yq libboost-dev
 
-    - name: Build
-      run: |
-        npm install
-        npm run build
-    - name: Package
-      run: |    
-        npm run dist
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Build
+        run: |
+          npm install
+          npm run build
+      - name: Package
+        run: |
+          npx @electron/packager . deepnest --out dist
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}/${{ matrix.node-version }}
+          path: dist/
+          retention-days: 1
+
+      - name: Run app
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          appName=$(ls dist | head -1)
+          chmod +x ./dist/$appName/deepnest
+          ./dist/$appName/deepnest
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: nesting-results-${{ matrix.os }}/${{ matrix.node-version }}
+          path: ~/Downloads/nesting-*
+          retention-days: 1

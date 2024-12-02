@@ -11,10 +11,15 @@ const { ensureDirSync } = require("fs-extra");
 //   [FuseV1Options.RunAsNode]: undefined,
 // });
 
-const inputDir = path.resolve(__dirname, "input");
-const outputDir = path.resolve(__dirname, "test-results", "output");
+const robotFile = path.resolve(__dirname, "robot.js");
+const inputDir = path.resolve(app.getAppPath(), "input");
+const outputDir = path.resolve(
+  app.getPath("downloads"),
+  `nesting-${new Date().toISOString()}`
+);
 ensureDirSync(outputDir);
 const downloadFile = path.resolve(outputDir, "result.svg");
+const dataFile = path.resolve(outputDir, "data.json");
 
 const exec = async () => {
   const files = (await readdir(inputDir))
@@ -33,14 +38,11 @@ const exec = async () => {
 
     app.on("main-window", async ({ mainWindow }) => {
       const data = await mainWindow.webContents.executeJavaScript(
-        (await readFile(path.resolve(__dirname, "robot.js"))).toString(),
+        (await readFile(robotFile)).toString(),
         true
       );
 
-      await writeFile(
-        path.resolve(outputDir, "data.json"),
-        JSON.stringify(data, null, 2)
-      );
+      await writeFile(dataFile, JSON.stringify(data, null, 2));
 
       app.quit();
 

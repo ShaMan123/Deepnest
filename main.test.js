@@ -17,9 +17,12 @@ console.log("paths:", {
   downloads: app.getPath("downloads"),
 });
 const inputDir = path.resolve(app.getAppPath(), "input");
+const now = new Date();
 const outputDir = path.resolve(
   app.getPath("downloads"),
-  `nesting-${new Date().toISOString()}`
+  `nesting-${now.getDate()}-${
+    now.getMonth() + 1
+  }-${now.getHours()}-${now.getMinutes()}`
 );
 ensureDirSync(outputDir);
 const downloadFile = path.resolve(outputDir, "result.svg");

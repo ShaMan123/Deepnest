@@ -6,13 +6,18 @@ on:
     branches: [main, master]
 jobs:
   exec:
-    if: false
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 5
-    runs-on: ubuntu-20.04
     steps:
-      - name: boost+chromium
+      - name: boost
+        run: sudo apt-get update && sudo apt-get install -yq libboost-dev
+      - name: Install chromium
+        if: matrix.os == 'ubuntu-20.04'
         # https://launchpad.net/ubuntu/+source/chromium-browser/101.0.4951.64-0ubuntu0.18.04.1
-        run: sudo apt-get update && sudo apt-get install -yq libboost-dev chromium-browser=101.0.4951.64
+        run: sudo apt-get install chromium-browser=101.0.4951.64
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -24,5 +29,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: nesting
-          path: test-results/
+          path: output/
           retention-days: 1

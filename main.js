@@ -87,7 +87,7 @@ function createMainWindow() {
     width: Math.ceil(width*0.9), 
     height: Math.ceil(height*0.9), 
     frame: !frameless, 
-    show: false,
+    show: !!process.env.CI,
     webPreferences: {
       contextIsolation: false,
       enableRemoteModule: true,      
@@ -136,7 +136,7 @@ function createBackgroundWindows() {
 	// used to have 8, now just 1 background window
 	if(winCount < 1){
 		var back = new BrowserWindow({
-      show: false,
+      show: !!process.env.CI,
       webPreferences: {
         contextIsolation: false,
         enableRemoteModule: true,
@@ -147,7 +147,7 @@ function createBackgroundWindows() {
 
     require('@electron/remote/main').enable(back.webContents)
 		
-    if (process.env["deepnest_debug"] === '1') 
+    if (process.env["deepnest_debug"] === '1' || process.env.CI) 
 		  back.webContents.openDevTools();
 		
 		back.loadURL(url.format({

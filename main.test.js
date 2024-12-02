@@ -13,10 +13,11 @@ const { ensureDirSync } = require("fs-extra");
 
 const robotFile = path.resolve(__dirname, "robot.js");
 const inputDir = path.resolve(app.getAppPath(), "input");
-const outputDir = path.resolve(
-  app.getPath("downloads"),
-  `nesting-${new Date().toISOString()}`
-);
+// const outputDir = path.resolve(
+//   app.getPath("downloads"),
+//   `nesting-${new Date().toISOString()}`
+// );
+const outputDir = path.resolve(__dirname, "output");
 ensureDirSync(outputDir);
 const downloadFile = path.resolve(outputDir, "result.svg");
 const dataFile = path.resolve(outputDir, "data.json");

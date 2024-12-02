@@ -60,5 +60,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nesting-results-${{ matrix.os }}
-          path: ~/Downloads/nesting-*
+          path: output/
           retention-days: 1

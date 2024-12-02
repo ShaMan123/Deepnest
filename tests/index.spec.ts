@@ -81,19 +81,17 @@ test("Nest", async ({}, testInfo) => {
     //   }
     // );
 
-    await electronApp.evaluate(
-      ({ dialog }, paths) => {
-        dialog.showOpenDialog = async (): Promise<OpenDialogReturnValue> => ({
-          filePaths: paths,
-          canceled: false,
-        });
-      },
-      [
-        path.resolve(process.cwd(), "input", "letters.svg"),
-        path.resolve(process.cwd(), "input", "letters2.svg"),
-        path.resolve(process.cwd(), "input", "letters3.svg"),
-      ]
-    );
+    const inputDir = path.resolve(process.cwd(), "input");
+    const files = (await readdir(inputDir))
+      .filter((file) => path.extname(file) === ".svg")
+      .map((file) => path.resolve(inputDir, file));
+
+    await electronApp.evaluate(({ dialog }, paths) => {
+      dialog.showOpenDialog = async (): Promise<OpenDialogReturnValue> => ({
+        filePaths: paths,
+        canceled: false,
+      });
+    }, files);
     await window.click("id=import");
 
     await window.click("id=addsheet");
@@ -168,12 +166,14 @@ test("Nest", async ({}, testInfo) => {
 
   // await expect(window.locator("id=progressbar")).toBeVisible();
   const n = 1;
-  await expect(
-    window
-      .locator("id=nestlist")
-      .locator("span")
-      .nth(n - 1)
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(() =>
+    expect(
+      window
+        .locator("id=nestlist")
+        .locator("span")
+        .nth(n - 1)
+    ).toBeVisible()
+  ).toPass();
   await expect(window.locator("id=nestinfo").locator("h1").nth(0)).toHaveText(
     "1"
   );

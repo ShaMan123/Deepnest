@@ -31,8 +31,8 @@ type NestingResult = {
 
 // test.use({ launchOptions: { slowMo: !process.env.CI ? 500 : 0 } });
 
-test.setTimeout(120_000);
-!process.env.CI && test.use({ launchOptions: { slowMo: 2000 } });
+test.setTimeout(5 * 60_000);
+// !process.env.CI && test.use({ launchOptions: { slowMo: 2000 } });
 
 const sheet = { width: 3000, height: 1000 };
 

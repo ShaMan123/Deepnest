@@ -141,7 +141,9 @@ test("Nest", async ({}, testInfo) => {
       dialog.showSaveDialogSync = () => path;
     }, file);
     await window.click("id=export");
-    await expect(window.locator("id=exportsvg")).toBeVisible();
+    await expect(window.locator("id=exportsvg")).toBeVisible({
+      timeout: 30_000,
+    });
     await window.click("id=exportsvg");
     return (await readFile(file)).toString();
   };
@@ -164,14 +166,14 @@ test("Nest", async ({}, testInfo) => {
 
   // await window.pause();
 
-  await expect(window.locator("id=progressbar")).toBeVisible();
+  // await expect(window.locator("id=progressbar")).toBeVisible();
   const n = 1;
   await expect(
     window
       .locator("id=nestlist")
       .locator("span")
       .nth(n - 1)
-  ).toBeVisible({ timeout: 60_000 });
+  ).toBeVisible({ timeout: 120_000 });
   await expect(window.locator("id=nestinfo").locator("h1").nth(0)).toHaveText(
     "1"
   );

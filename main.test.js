@@ -12,8 +12,11 @@ const { ensureDirSync } = require("fs-extra");
 // });
 
 const robotFile = path.resolve(__dirname, "robot.js");
+console.log("paths:", {
+  main: app.getAppPath(),
+  downloads: app.getPath("downloads"),
+});
 const inputDir = path.resolve(app.getAppPath(), "input");
-console.log("paths:", app.getAppPath(), app.getPath("downloads"));
 const outputDir = path.resolve(
   app.getPath("downloads"),
   `nesting-${new Date().toISOString()}`

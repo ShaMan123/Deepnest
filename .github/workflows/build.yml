@@ -34,6 +34,11 @@ jobs:
         # with:
         # node-version: ${{ matrix.node-version }}
 
+      - name: Change entry point
+        run: |
+          json=$(node -p "JSON.stringify({...require('./package.json'), main: 'main.test.js' }, null, 2)")
+          echo $json > package.json
+
       - name: Build
         run: |
           npm install
@@ -53,6 +58,9 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           appName=$(ls dist | head -1)
+          # copy input files
+          cp -R ./input ./dist/$appName/resources/app
+          # make executable and run
           chmod +x ./dist/$appName/deepnest
           xvfb-run ./dist/$appName/deepnest
 
@@ -60,5 +68,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nesting-results-${{ matrix.os }}
-          path: output/
+          path: /home/runner/
           retention-days: 1

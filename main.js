@@ -1,20 +1,13 @@
-const electron = require('electron')
-const { Menu, ipcMain } = electron
+const { app, ipcMain, BrowserWindow, screen } = require('electron')
 const fs = require('graceful-fs');
-
-require('@electron/remote/main').initialize()
-
-// Module to control application life.
-const app = electron.app
-
-app.commandLine.appendSwitch('--enable-precise-memory-info');
-
-// Module to create native browser window.
-const BrowserWindow = electron.BrowserWindow
-
 const path = require('path')
 const os = require('os')
 const url = require('url')
+
+require('@electron/remote/main').initialize()
+
+app.commandLine.appendSwitch('--enable-precise-memory-info');
+
 /*
 // main menu for mac
 const template = [
@@ -85,7 +78,7 @@ if (!gotTheLock) {
 function createMainWindow() {
 	
   // Create the browser window.
-  const {width, height} = electron.screen.getPrimaryDisplay().workAreaSize;
+  const {width, height} = screen.getPrimaryDisplay().workAreaSize;
   
   var frameless = process.platform == 'darwin';
   //var frameless = true;
@@ -179,9 +172,10 @@ function createBackgroundWindows() {
 app.on('ready', () => {
 	createMainWindow();
 	mainWindow.once('ready-to-show', () => {
-	  mainWindow.show();
+	  !process.env.CI &&  mainWindow.show();
 	  createBackgroundWindows();
 	})
+  app.emit('main-window', { mainWindow });
 	mainWindow.on('closed', () => {
 	  app.quit();
 	});
@@ -272,8 +266,8 @@ ipcMain.on('purchase-success', function(event){
 
 ipcMain.on("setPlacements", (event, payload) => {
   global.exportedPlacements = payload;
-} );
+});
 
 ipcMain.on("test", (event, payload) => {
   global.test = payload;
-} );
+});

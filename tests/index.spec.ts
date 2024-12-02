@@ -163,7 +163,7 @@ test("Nest", async ({}) => {
       ).toBeVisible()
     ).toPass();
 
-  // await window.pause();
+  await window.pause();
   await expect(window.locator("id=progressbar")).toBeVisible();
   await waitForIteration(1);
   await expect(window.locator("id=nestinfo").locator("h1").nth(0)).toHaveText(

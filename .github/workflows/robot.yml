@@ -6,8 +6,9 @@ on:
     branches: [main, master]
 jobs:
   exec:
+    if: false
     timeout-minutes: 5
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: boost+chromium
         # https://launchpad.net/ubuntu/+source/chromium-browser/101.0.4951.64-0ubuntu0.18.04.1

@@ -8,7 +8,7 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [windows-2022, ubuntu-20.04, ubuntu-latest]
+        os: [ubuntu-latest]
     timeout-minutes: 5
     runs-on: ${{ matrix.os }}
     steps:

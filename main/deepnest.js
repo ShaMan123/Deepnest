@@ -6,6 +6,10 @@
 
 	'use strict';
 
+	const SvgParser = require('./svgparser');
+	const ClipperLib = require('./util/clipper');
+	const {GeometryUtil} = require('./util/geometryutil');
+	const {simplify} = require('./util/simplify')
 	
 	/**
 	 * 
@@ -58,8 +62,9 @@
 			// parse svg
 			// config.scale is the default scale, and may not be applied
 			// scalingFactor is an absolute scaling that must be applied regardless of input svg contents
-			const svg = SvgParser.clean(SvgParser.load(dirpath, svgstring, config.scale, scalingFactor), dxfFlag);
-			
+			var svg = SvgParser.load(dirpath, svgstring, config.scale, scalingFactor);
+			svg = SvgParser.clean(dxfFlag);
+
 			if(filename){
 				this.imports.push({
 					filename: filename,
@@ -67,10 +72,8 @@
 				});
 			}
 			
-			var parts = this.getParts(svg.children, filename);
-			for(var i=0; i<parts.length; i++){
-				this.parts.push(parts[i]);
-			}
+			const parts = this.getParts(svg.children, filename);
+			this.parts.push(...parts)
 
 			return parts;
 			
@@ -193,7 +196,7 @@
 				}
 			}
 			
-			var simple = window.simplify(copy, tolerance, true);
+			var simple = simplify(copy, tolerance, true);
 			// now a polygon again
 			simple.pop();
 			
@@ -1021,7 +1024,7 @@
 		
 		this.eventEmitter.addEventListener('background-response', ({ detail: payload }) => {
 			this.eventEmitter.dispatchEvent(new CustomEvent("setPlacements", { detail: payload }));
-			console.log('ipc response',payload);
+			// console.log('ipc response',payload);
 			if(!GA){
 				// user might have quit while we're away
 				return;

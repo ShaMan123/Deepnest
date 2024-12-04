@@ -1,6 +1,11 @@
 'use strict';
 
-const { calculateNFP } = require('../minkowski/Release/addon')
+const { GeometryUtil } = require('./util/geometryutil');
+const ClipperLib = require('./util/clipper');
+const d3 = require('./util/d3-polygon');
+const Parallel = require('./util/parallel');
+const { calculateNFP } = require('bindings')('addon.node');
+const path = require('path');
 
 
 function clone(nfp){
@@ -81,11 +86,11 @@ const db = {
 	
 	insert : function(obj, inner){
 		var key = 'A'+obj.A+'B'+obj.B+'Arot'+parseInt(obj.Arotation)+'Brot'+parseInt(obj.Brotation);
-		if(window.performance.memory.totalJSHeapSize < 0.8*window.performance.memory.jsHeapSizeLimit){
+		// if(window.performance.memory.totalJSHeapSize < 0.8*window.performance.memory.jsHeapSizeLimit){
 			nfpcache[key] = cloneNfp(obj.nfp, inner);
 			//console.log('cached: ',window.cache[key].poly);
 			//console.log('using', window.performance.memory.totalJSHeapSize/window.performance.memory.jsHeapSizeLimit);
-		}
+		// }
 		
 		/*obj.children = obj.nfp.children;
 		
@@ -269,23 +274,23 @@ add package 'filequeue 0.5.0' if you enable this
 		  
 		  
 		  if(pairs.length > 0){
-			  var p = new Parallel(pairs, {
-				evalPath: 'util/eval.js',
-				synchronous: false
-			  });
+			//   var p = new Parallel(pairs, {
+			// 	evalPath: path.resolve('./util/eval.js'),
+			// 	synchronous: false
+			//   });
 			  
-			  var spawncount = 0;
+			//   var spawncount = 0;
 				
-				p._spawnMapWorker = function (i, cb, done, env, wrk){
-					// hijack the worker call to check progress
-					eventEmitter.dispatchEvent(new CustomEvent('background-progress', { detail: {index: index, progress: 0.5*(spawncount++/pairs.length)} }));
-					return Parallel.prototype._spawnMapWorker.call(p, i, cb, done, env, wrk);
-				}
+			// 	p._spawnMapWorker = function (i, cb, done, env, wrk){
+			// 		// hijack the worker call to check progress
+			// 		eventEmitter.dispatchEvent(new CustomEvent('background-progress', { detail: {index: index, progress: 0.5*(spawncount++/pairs.length)} }));
+			// 		return Parallel.prototype._spawnMapWorker.call(p, i, cb, done, env, wrk);
+			// 	}
 			  
-			  p.require('clipper.js');
-			  p.require('geometryutil.js');
+			//   p.require('clipper.js');
+			//   p.require('geometryutil.js');
 		  
-			  p.map(process).then(function(processed){
+			  pairs.map(process).map(function(processed){
 			  	 function getPart(source){
 					for(var k=0; k<parts.length; k++){
 						if(parts[k].source == source){
@@ -837,6 +842,7 @@ function placeParts(sheets, parts, config, nestindex, eventEmitter){
 	
 	var key, nfp;
 	var part;
+	var _sheets = sheets.slice()
 	
 	while(parts.length > 0){
 		
@@ -844,7 +850,7 @@ function placeParts(sheets, parts, config, nestindex, eventEmitter){
 		var placements = [];
 		
 		// open a new sheet
-		var sheet = sheets.shift();
+		var sheet = _sheets.shift();
 		var sheetarea = Math.abs(GeometryUtil.polygonArea(sheet));
 		totalsheetarea += sheetarea;
 		

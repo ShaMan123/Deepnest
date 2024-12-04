@@ -4,6 +4,7 @@
   "description": "Deep nesting for Laser and CNC",
   "main": "main.js",
   "license": "MIT",
+  "gypfile": true,
   "scripts": {
     "start": "electron .",
     "test": "playwright test",
@@ -40,8 +41,11 @@
   },
   "dependencies": {
     "@electron/remote": "^2.1.2",
+    "bindings": "^1.5.0",
     "fs-extra": "^11.2.0",
     "graceful-fs": "^4.2.11",
+    "jsdom": "^25.0.1",
+    "pathseg": "^1.2.1",
     "request": "^2.88.2"
   },
   "build": {

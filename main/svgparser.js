@@ -4,8 +4,13 @@
  * Licensed under the MIT license
  */
  
- (function(root){
+
 	'use strict';
+
+	const { Matrix } = require('./util/matrix')
+	const { GeometryUtil } = require('./util/geometryutil')
+	require('./util/pathsegpolyfill')
+	
 	
 	function SvgParser(){
 		// the SVG document
@@ -1571,7 +1576,7 @@
 	// expose public methods
 	var parser = new SvgParser();
 	
-	root.SvgParser = {
+	module.exports = {
 		config: parser.config.bind(parser),
 		load: parser.load.bind(parser),
 		clean: parser.cleanInput.bind(parser),
@@ -1587,4 +1592,3 @@
 		polygonElements: parser.polygonElements
 	};
 	
-}(this));

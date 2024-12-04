@@ -1,5 +1,7 @@
 'use strict';
 
+const { calculateNFP } = require('../minkowski/Release/addon')
+
 
 function clone(nfp){
 	var newnfp = [];
@@ -42,10 +44,10 @@ function cloneNfp(nfp, inner){
 	return newnfp;
 }
 
-window.db = {
+const db = {
 	has: function(obj){
 		var key = 'A'+obj.A+'B'+obj.B+'Arot'+parseInt(obj.Arotation)+'Brot'+parseInt(obj.Brotation);
-		if(window.nfpcache[key]){
+		if(nfpcache[key]){
 			return true;
 		}
 		return false;
@@ -54,8 +56,8 @@ window.db = {
 	find : function(obj, inner){
 		var key = 'A'+obj.A+'B'+obj.B+'Arot'+parseInt(obj.Arotation)+'Brot'+parseInt(obj.Brotation);
 		//console.log('key: ', key);
-		if(window.nfpcache[key]){
-			return cloneNfp(window.nfpcache[key], inner);
+		if(nfpcache[key]){
+			return cloneNfp(nfpcache[key], inner);
 		}
 		/*var keypath = './nfpcache/'+key+'.json';
 		if(fs.existsSync(keypath)){
@@ -70,7 +72,7 @@ window.db = {
 			var nfp = obj.nfp;
 			nfp.children = obj.children;
 			
-			window.nfpcache[key] = clone(nfp);
+			nfpcache[key] = clone(nfp);
 			
 			return nfp;
 		}*/
@@ -80,7 +82,7 @@ window.db = {
 	insert : function(obj, inner){
 		var key = 'A'+obj.A+'B'+obj.B+'Arot'+parseInt(obj.Arotation)+'Brot'+parseInt(obj.Brotation);
 		if(window.performance.memory.totalJSHeapSize < 0.8*window.performance.memory.jsHeapSizeLimit){
-			window.nfpcache[key] = cloneNfp(obj.nfp, inner);
+			nfpcache[key] = cloneNfp(obj.nfp, inner);
 			//console.log('cached: ',window.cache[key].poly);
 			//console.log('using', window.performance.memory.totalJSHeapSize/window.performance.memory.jsHeapSizeLimit);
 		}
@@ -96,22 +98,21 @@ window.db = {
 	}
 }
 
-window.onload = function () {
-	const { ipcRenderer } = require('electron');
-	window.ipcRenderer = ipcRenderer;
-	window.addon = require('../minkowski/Release/addon');
-	
-	window.path = require('path')
-	window.url = require('url')
-	window.fs = require('graceful-fs');
+const nfpcache = {}
+
+/**
+ * 
+ * @param {EventTarget} eventEmitter 
+ */
+function processNesting(eventEmitter) {
+
 /*
 add package 'filequeue 0.5.0' if you enable this
 	window.FileQueue = require('filequeue');
 	window.fq = new FileQueue(500);
 */	
-	window.nfpcache = {};
 	  
-	ipcRenderer.on('background-start', (event, data) => {
+	eventEmitter.addEventListener('background-start', ({ detail: data }) => {
 		var index = data.index;
 	    var individual = data.individual;
 
@@ -256,17 +257,12 @@ add package 'filequeue 0.5.0' if you enable this
 		  function sync(){
 		  	//console.log('starting synchronous calculations', Object.keys(window.nfpCache).length);
 		  	console.log('in sync');
-		  	var c=0;
-		  	for (var key in window.nfpcache) {
-				c++;
-			}
-			console.log('nfp cached:', c);
-			console.log()
-            ipcRenderer.send('test', [data.sheets, parts, data.config, index]);
-		  	var placement = placeParts(data.sheets, parts, data.config, index);
+
+            eventEmitter.dispatchEvent(new CustomEvent(('test', {detail: [data.sheets, parts, data.config, index]})));
+		  	var placement = placeParts(data.sheets, parts, data.config, index, eventEmitter);
 	
 			placement.index = data.index;
-			ipcRenderer.send('background-response', placement);
+			eventEmitter.dispatchEvent(new CustomEvent('background-response', {detail:placement}));
 		  }
 		  
 		  console.time('Total');
@@ -282,7 +278,7 @@ add package 'filequeue 0.5.0' if you enable this
 				
 				p._spawnMapWorker = function (i, cb, done, env, wrk){
 					// hijack the worker call to check progress
-					ipcRenderer.send('background-progress', {index: index, progress: 0.5*(spawncount++/pairs.length)});
+					eventEmitter.dispatchEvent(new CustomEvent('background-progress', { detail: {index: index, progress: 0.5*(spawncount++/pairs.length)} }));
 					return Parallel.prototype._spawnMapWorker.call(p, i, cb, done, env, wrk);
 				}
 			  
@@ -339,7 +335,7 @@ add package 'filequeue 0.5.0' if you enable this
 						Brotation: processed[i].Brotation,
 						nfp: processed[i].nfp
 					};
-					window.db.insert(doc);
+					db.insert(doc);
 					
 				}
 				console.timeEnd('Total');
@@ -639,7 +635,7 @@ function getOuterNfp(A, B, inside){
 	}*/
 	
 	// try the file cache if the calculation will take a long time
-	var doc = window.db.find({ A: A.source, B: B.source, Arotation: A.rotation, Brotation: B.rotation });
+	var doc = db.find({ A: A.source, B: B.source, Arotation: A.rotation, Brotation: B.rotation });
 	
 	if(doc){
 		return doc;
@@ -649,7 +645,7 @@ function getOuterNfp(A, B, inside){
 	if(inside || (A.children && A.children.length > 0)){
 	//console.log('computing minkowski: ',A.length, B.length);
 	//console.time('addon');
-	nfp = addon.calculateNFP({A: A, B: B});
+	nfp = calculateNFP({ A, B });
 	//console.timeEnd('addon');
 	}
 	else{
@@ -709,7 +705,7 @@ function getOuterNfp(A, B, inside){
 			Brotation: B.rotation,
 			nfp: nfp
 		};
-		window.db.insert(doc);
+		db.insert(doc);
 	}
 	
 	return nfp;
@@ -739,7 +735,7 @@ function getFrame(A){
 
 function getInnerNfp(A, B, config){
 	if(typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
-		var doc = window.db.find({ A: A.source, B: B.source, Arotation: 0, Brotation: B.rotation }, true);
+		var doc = db.find({ A: A.source, B: B.source, Arotation: 0, Brotation: B.rotation }, true);
 	
 		if(doc){
 			//console.log('fetch inner', A.source, B.source, doc);
@@ -801,13 +797,13 @@ function getInnerNfp(A, B, config){
 			Brotation: B.rotation,
 			nfp: f
 		};
-		window.db.insert(doc, true);
+		db.insert(doc, true);
 	}
 	
 	return f;
 }
 
-function placeParts(sheets, parts, config, nestindex){
+function placeParts(sheets, parts, config, nestindex, eventEmitter){
 
 	if(!sheets){
 		return null;
@@ -1144,7 +1140,7 @@ function placeParts(sheets, parts, config, nestindex){
 				placednum += allplacements[j].sheetplacements.length;
 			}
 			//console.log(placednum, totalnum);
-			ipcRenderer.send('background-progress', {index: nestindex, progress: 0.5 + 0.5*(placednum/totalnum)});
+			eventEmitter.dispatchEvent(new CustomEvent('background-progress', { detail: {index: nestindex, progress: 0.5 + 0.5*(placednum/totalnum)}}));
 			console.timeEnd('placement');
 		}
 		
@@ -1177,7 +1173,7 @@ function placeParts(sheets, parts, config, nestindex){
 		fitness += 100000000*(Math.abs(GeometryUtil.polygonArea(parts[i]))/totalsheetarea);
 	}
 	// send finish progerss signal
-	ipcRenderer.send('background-progress', {index: nestindex, progress: -1});
+	eventEmitter.dispatchEvent(new CustomEvent('background-progress', { detail: {index: nestindex, progress: -1} }));
 
 	console.log('WATCH', allplacements);
 	
@@ -1188,3 +1184,5 @@ function placeParts(sheets, parts, config, nestindex){
 function alert(message) { 
     console.log('alert: ', message);
 }
+
+module.exports = { processNesting }

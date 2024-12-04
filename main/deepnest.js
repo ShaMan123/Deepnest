@@ -3,28 +3,31 @@
  * Licensed under GPLv3
  */
  
-(function(root){
+
 	'use strict';
+
 	
-	root.DeepNest = new DeepNest(require('electron').ipcRenderer);
-	
-	function DeepNest(eventEmitter){		
-		var svg = null;
+	/**
+	 * 
+	 * @param {EventTarget} eventEmitter 
+	 * @param {Record<string, string|number>} configuration 
+	 */
+	function DeepNest(eventEmitter, configuration = {
+		clipperScale: 10000000,
+		curveTolerance: 0.3, 
+		spacing: 0,
+		rotations: 4,
+		populationSize: 10,
+		mutationRate: 10,
+		threads: 4,
+		placementType: 'gravity',
+		mergeLines: true,
+		timeRatio: 0.5,
+		scale: 72,
+		simplify: false
+	}) {		
 		
-		var config = {
-			clipperScale: 10000000,
-			curveTolerance: 0.3, 
-			spacing: 0,
-			rotations: 4,
-			populationSize: 10,
-			mutationRate: 10,
-			threads: 4,
-			placementType: 'gravity',
-			mergeLines: true,
-			timeRatio: 0.5,
-			scale: 72,
-			simplify: false
-		};
+		var config = {...configuration};
 		
 		// list of imported files
 		// import: {filename: 'blah.svg', svg: svgroot}
@@ -48,13 +51,14 @@
 		var displayCallback = null;
 		// a running list of placements
 		this.nests = [];
+
+		this.eventEmitter = eventEmitter;
 		
 		this.importsvg = function(filename, dirpath, svgstring, scalingFactor, dxfFlag){
 			// parse svg
 			// config.scale is the default scale, and may not be applied
 			// scalingFactor is an absolute scaling that must be applied regardless of input svg contents
-			svg = SvgParser.load(dirpath, svgstring, config.scale, scalingFactor);
-			svg = SvgParser.clean(dxfFlag);
+			const svg = SvgParser.clean(SvgParser.load(dirpath, svgstring, config.scale, scalingFactor), dxfFlag);
 			
 			if(filename){
 				this.imports.push({
@@ -1015,8 +1019,8 @@
 			}
 		}
 		
-		eventEmitter.on('background-response', (event, payload) => {
-		    eventEmitter.send("setPlacements", payload);
+		this.eventEmitter.addEventListener('background-response', ({ detail: payload }) => {
+			this.eventEmitter.dispatchEvent(new CustomEvent("setPlacements", { detail: payload }));
 			console.log('ipc response',payload);
 			if(!GA){
 				// user might have quit while we're away
@@ -1151,8 +1155,24 @@
 						children[j] = child;
             filenames[j] = filename;
 					}
-					
-					eventEmitter.send('background-start', {index: i, sheets: sheets, sheetids: sheetids, sheetsources: sheetsources, sheetchildren: sheetchildren, individual: GA.population[i], config: config, ids: ids, sources: sources, children: children, filenames: filenames});
+
+					this.eventEmitter.dispatchEvent(
+						new CustomEvent("background-start", {
+						  detail: {
+							index: i,
+							sheets,
+							sheetids,
+							sheetsources,
+							sheetchildren,
+							individual: GA.population[i],
+							config,
+							ids,
+							sources,
+							children,
+							filenames,
+						  },
+						})
+					  );
 					running++;					
 				}
 			}
@@ -1242,71 +1262,6 @@
 			}
 			
 			return normal;
-		}
-		
-		// returns an array of SVG elements that represent the placement, for export or rendering
-		this.applyPlacement = function(placement){
-			var i, j, k;
-			var clone = [];
-			for(i=0; i<parts.length; i++){
-				clone.push(parts[i].cloneNode(false));
-			}
-			
-			var svglist = [];
-
-			for(i=0; i<placement.length; i++){
-				var newsvg = svg.cloneNode(false);
-				newsvg.setAttribute('viewBox', '0 0 '+binBounds.width+' '+binBounds.height);
-				newsvg.setAttribute('width',binBounds.width + 'px');
-				newsvg.setAttribute('height',binBounds.height + 'px');
-				var binclone = bin.cloneNode(false);
-				
-				binclone.setAttribute('class','bin');
-				binclone.setAttribute('transform','translate('+(-binBounds.x)+' '+(-binBounds.y)+')');
-				newsvg.appendChild(binclone);
-
-				for(j=0; j<placement[i].length; j++){
-					var p = placement[i][j];
-					var part = tree[p.id];
-					
-					// the original path could have transforms and stuff on it, so apply our transforms on a group
-					var partgroup = document.createElementNS(svg.namespaceURI, 'g');
-					partgroup.setAttribute('transform','translate('+p.x+' '+p.y+') rotate('+p.rotation+')');
-					partgroup.appendChild(clone[part.source]);
-					
-					if(part.children && part.children.length > 0){
-						var flattened = _flattenTree(part.children, true);
-						for(k=0; k<flattened.length; k++){
-							
-							var c = clone[flattened[k].source];
-							if(flattened[k].hole){
-								c.setAttribute('class','hole');
-							}
-							partgroup.appendChild(c);
-						}
-					}
-					
-					newsvg.appendChild(partgroup);
-				}
-				
-				svglist.push(newsvg);
-			}
-			
-			// flatten the given tree into a list
-			function _flattenTree(t, hole){
-				var flat = [];
-				for(var i=0; i<t.length; i++){
-					flat.push(t[i]);
-					t[i].hole = hole;
-					if(t[i].children && t[i].children.length > 0){
-						flat = flat.concat(_flattenTree(t[i].children, !hole));
-					}
-				}
-				
-				return flat;
-			}
-			
-			return svglist;
 		}
 		
 		this.stop = function(){
@@ -1468,4 +1423,6 @@
 		return pop[0];
 	}
 	
-})(this);
+module.exports = {
+	DeepNest
+}

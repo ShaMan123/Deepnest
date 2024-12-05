@@ -6,6 +6,7 @@ const d3 = require('./util/d3-polygon');
 const Parallel = require('./util/parallel');
 const { calculateNFP } = require('bindings')('addon.node');
 const path = require('path');
+const { processPairs } = require('./processPairs');
 
 
 function clone(nfp){
@@ -274,23 +275,9 @@ add package 'filequeue 0.5.0' if you enable this
 		  
 		  
 		  if(pairs.length > 0){
-			//   var p = new Parallel(pairs, {
-			// 	evalPath: path.resolve('./util/eval.js'),
-			// 	synchronous: false
-			//   });
-			  
-			//   var spawncount = 0;
-				
-			// 	p._spawnMapWorker = function (i, cb, done, env, wrk){
-			// 		// hijack the worker call to check progress
-			// 		eventEmitter.dispatchEvent(new CustomEvent('background-progress', { detail: {index: index, progress: 0.5*(spawncount++/pairs.length)} }));
-			// 		return Parallel.prototype._spawnMapWorker.call(p, i, cb, done, env, wrk);
-			// 	}
-			  
-			//   p.require('clipper.js');
-			//   p.require('geometryutil.js');
-		  
-			  pairs.map(process).map(function(processed){
+			const abortController = new AbortController();
+			eventEmitter.addEventListener('stopped', () => abortController.abort())
+			  processPairs(pairs, { threadCount: 4, signal: abortController.signal }).then(function(processed){
 			  	 function getPart(source){
 					for(var k=0; k<parts.length; k++){
 						if(parts[k].source == source){
@@ -1181,7 +1168,7 @@ function placeParts(sheets, parts, config, nestindex, eventEmitter){
 	// send finish progerss signal
 	eventEmitter.dispatchEvent(new CustomEvent('background-progress', { detail: {index: nestindex, progress: -1} }));
 
-	console.log('WATCH', allplacements);
+	// console.log('WATCH', allplacements);
 	
 	return {placements: allplacements, fitness: fitness, area: sheetarea, mergedLength: totalMerged };
 }

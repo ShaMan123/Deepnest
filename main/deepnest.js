@@ -1278,6 +1278,7 @@
 				clearInterval(workerTimer);
 				workerTimer = null;
 			}
+			eventEmitter.dispatchEvent(new CustomEvent('stopped'));
 		};
 		
 		this.reset = function(){

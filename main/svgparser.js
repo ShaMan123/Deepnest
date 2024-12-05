@@ -260,7 +260,7 @@
 				openpaths.push(p);
 			}
 			else if(p.tagName == 'path'){
-				const pathSegList = p.pathSegList || (p.pathSegList=new window.SVGPathSegList(p));
+				const pathSegList = p.pathSegList || (p.pathSegList = new window.SVGPathSegList(p));
 				var lastCommand = pathSegList.getItem(pathSegList.numberOfItems-1).pathSegTypeAsLetter;
 				if(lastCommand != 'z' && lastCommand != 'Z'){
 					// endpoints are actually far apart
@@ -316,6 +316,7 @@
 				openpaths.splice(i,1, merged);
 				
 				if(this.isClosed(merged, tolerance)){
+					merged.pathSegList || (merged.pathSegList = new window.SVGPathSegList(merged));
 					var lastCommand = merged.pathSegList.getItem(merged.pathSegList.numberOfItems-1).pathSegTypeAsLetter;
 					if(lastCommand != 'z' && lastCommand != 'Z'){
 						// endpoints are actually far apart
@@ -561,7 +562,7 @@
 	// turn one path into individual segments
 	SvgParser.prototype.splitPathSegments = function(path){
 		// we'll assume that splitpath has already been run on this path, and it only has one M/m command 
-		var seglist = path.pathSegList;
+		var seglist = path.pathSegList || (path.pathSegList = new window.SVGPathSegList(path));
 		var split = [];
 		
 		var addLine = function(x1, y1, x2, y2){
@@ -639,7 +640,7 @@
 		else if(path.tagName == 'path'){
 			this.pathToAbsolute(path);
 			
-			var seglist = path.pathSegList;
+			var seglist = path.pathSegList || (path.pathSegList = new window.SVGPathSegList(path));
 			var reversed = [];
 			
 			var firstCommand = seglist.getItem(0);
@@ -726,9 +727,10 @@
 	SvgParser.prototype.mergeOpenPaths = function(a, b){
 		var topath = function(svg, p){
 			if(p.tagName == 'line'){
-				var pa = svg.createElementNS('http://www.w3.org/2000/svg', 'path');
-				pa.pathSegList.appendItem(pa.createSVGPathSegMovetoAbs(Number(p.getAttribute('x1')),Number(p.getAttribute('y1'))));
-				pa.pathSegList.appendItem(pa.createSVGPathSegLinetoAbs(Number(p.getAttribute('x2')),Number(p.getAttribute('y2'))));
+				const pa = svg.createElementNS('http://www.w3.org/2000/svg', 'path');
+				const pathSegList = pa.pathSegList || (pa.pathSegList = new window.SVGPathSegList(pa));
+				pathSegList.appendItem(pa.createSVGPathSegMovetoAbs(Number(p.getAttribute('x1')),Number(p.getAttribute('y1'))));
+				pathSegList.appendItem(pa.createSVGPathSegLinetoAbs(Number(p.getAttribute('x2')),Number(p.getAttribute('y2'))));
 
 				return pa;
 			}
@@ -737,33 +739,26 @@
 				if(p.points.length < 2){
 					return null;
 				}
-				pa = svg.createElementNS('http://www.w3.org/2000/svg', 'path');
-				pa.pathSegList.appendItem(pa.createSVGPathSegMovetoAbs(p.points[0].x,p.points[0].y));
+				const pa = svg.createElementNS('http://www.w3.org/2000/svg', 'path');
+				const pathSegList = pa.pathSegList || (pa.pathSegList = new window.SVGPathSegList(pa));
+				pathSegList.appendItem(pa.createSVGPathSegMovetoAbs(p.points[0].x,p.points[0].y));
 				for(var i=1; i<p.points.length; i++){
-					pa.pathSegList.appendItem(pa.createSVGPathSegLinetoAbs(p.points[i].x,p.points[i].y));
+					pathSegList.appendItem(pa.createSVGPathSegLinetoAbs(p.points[i].x,p.points[i].y));
 				}				
 				return pa;
+			}
+
+			if(p.tagName === 'path') {
+				p.pathSegList || (p.pathSegList = new window.SVGPathSegList(p));
+				return p;
 			}
 			
 			return null;
 		}
 		
-		var patha;
-		if(a.tagName == 'path'){
-			patha = a;
-		}
-		else{
-			patha = topath(this.svg, a);
-		}
-		
-		var pathb;
-		if(b.tagName == 'path'){
-			pathb = b;
-		}
-		else{
-			pathb = topath(this.svg, b);
-		}
-				
+		var patha = topath(this.svg, a);
+		var pathb = topath(this.svg, b);
+
 		if(!patha || !pathb){
 			return null;
 		}
@@ -837,7 +832,7 @@
 		}
 		
 		if(p.tagName == 'path'){
-			const pathSegList = p.pathSegList || (p.pathSegList=new window.SVGPathSegList(p));
+			const pathSegList = p.pathSegList || (p.pathSegList = new window.SVGPathSegList(p));
 			for(var j=0; j<pathSegList.numberOfItems; j++){
 				var c = pathSegList.getItem(j);
 				if(c.pathSegTypeAsLetter == 'z' || c.pathSegTypeAsLetter == 'Z'){
@@ -910,8 +905,10 @@
 			throw Error('invalid path');
 		}
 		
-		var seglist = path.pathSegList;
+		var seglist = path.pathSegList || (path.pathSegList = new window.SVGPathSegList(path));
 		var x=0, y=0, x0=0, y0=0, x1=0, y1=0, x2=0, y2=0;
+
+		const proto = window.SVGPathElement.prototype;
 		
 		for(var i=0; i<seglist.numberOfItems; i++){
 			var command = seglist.getItem(i).pathSegTypeAsLetter;
@@ -929,20 +926,21 @@
 				if ('x'  in s) x+=s.x;
 				if ('y'  in s) y+=s.y;
 				switch(command){
-					case 'm': seglist.replaceItem(path.createSVGPathSegMovetoAbs(x,y),i);                   break;
-					case 'l': seglist.replaceItem(path.createSVGPathSegLinetoAbs(x,y),i);                   break;
-					case 'h': seglist.replaceItem(path.createSVGPathSegLinetoHorizontalAbs(x),i);           break;
-					case 'v': seglist.replaceItem(path.createSVGPathSegLinetoVerticalAbs(y),i);             break;
-					case 'c': seglist.replaceItem(path.createSVGPathSegCurvetoCubicAbs(x,y,x1,y1,x2,y2),i); break;
-					case 's': seglist.replaceItem(path.createSVGPathSegCurvetoCubicSmoothAbs(x,y,x2,y2),i); break;
-					case 'q': seglist.replaceItem(path.createSVGPathSegCurvetoQuadraticAbs(x,y,x1,y1),i);   break;
-					case 't': seglist.replaceItem(path.createSVGPathSegCurvetoQuadraticSmoothAbs(x,y),i);   break;
-					case 'a': seglist.replaceItem(path.createSVGPathSegArcAbs(x,y,s.r1,s.r2,s.angle,s.largeArcFlag,s.sweepFlag),i);   break;
+					case 'm': seglist.replaceItem(proto.createSVGPathSegMovetoAbs.call(path, x,y),i);                   break;
+					case 'l': seglist.replaceItem(proto.createSVGPathSegLinetoAbs.call(path, x,y),i);                   break;
+					case 'h': seglist.replaceItem(proto.createSVGPathSegLinetoHorizontalAbs.call(path, x),i);           break;
+					case 'v': seglist.replaceItem(proto.createSVGPathSegLinetoVerticalAbs.call(path, y),i);             break;
+					case 'c': seglist.replaceItem(proto.createSVGPathSegCurvetoCubicAbs.call(path, x,y,x1,y1,x2,y2),i); break;
+					case 's': seglist.replaceItem(proto.createSVGPathSegCurvetoCubicSmoothAbs.call(path, x,y,x2,y2),i); break;
+					case 'q': seglist.replaceItem(proto.createSVGPathSegCurvetoQuadraticAbs.call(path, x,y,x1,y1),i);   break;
+					case 't': seglist.replaceItem(proto.createSVGPathSegCurvetoQuadraticSmoothAbs.call(path, x,y),i);   break;
+					case 'a': seglist.replaceItem(proto.createSVGPathSegArcAbs.call(path, x,y,s.r1,s.r2,s.angle,s.largeArcFlag,s.sweepFlag),i);   break;
 					case 'z': case 'Z': x=x0; y=y0; break;
 				}
 			}
 			// Record the start of a subpath
 			if (command=='M' || command=='m') x0=x, y0=y;
+
 		}
 	};
 	
@@ -1076,10 +1074,11 @@
 					var arc1 = path.createSVGPathSegArcAbs(parseFloat(element.getAttribute('cx'))+parseFloat(element.getAttribute('rx')),element.getAttribute('cy'),element.getAttribute('rx'),element.getAttribute('ry'),0,1,0);
 					var arc2 = path.createSVGPathSegArcAbs(parseFloat(element.getAttribute('cx'))-parseFloat(element.getAttribute('rx')),element.getAttribute('cy'),element.getAttribute('rx'),element.getAttribute('ry'),0,1,0);
 					
-					path.pathSegList.appendItem(move);
-					path.pathSegList.appendItem(arc1);
-					path.pathSegList.appendItem(arc2);
-					path.pathSegList.appendItem(path.createSVGPathSegClosePath());
+					const pathSegList = path.pathSegList || (path.pathSegList = new window.SVGPathSegList(path));
+					pathSegList.appendItem(move);
+					pathSegList.appendItem(arc1);
+					pathSegList.appendItem(arc2);
+					pathSegList.appendItem(path.createSVGPathSegClosePath());
 					
 					var transformProperty = element.getAttribute('transform');
 					if(transformProperty){
@@ -1096,7 +1095,7 @@
 						return;
 					}
 					this.pathToAbsolute(element);
-					var seglist = element.pathSegList;
+					var seglist = element.pathSegList || (element.pathSegList = new window.SVGPathSegList(element));
 					var prevx = 0;
 					var prevy = 0;
 					
@@ -1282,7 +1281,7 @@
 			return false;
 		}
 				
-		var seglist = path.pathSegList || (path.pathSegList=new window.SVGPathSegList(path));
+		var seglist = path.pathSegList || (path.pathSegList = new window.SVGPathSegList(path));
 		
 		var x=0, y=0, x0=0, y0=0;
 		var paths = [];

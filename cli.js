@@ -16,6 +16,7 @@ const { DOMParser, XMLSerializer, document } = window;
  * @type DOMParser
  */
 global.DOMParser = DOMParser;
+global.document = document;
 
 function exportNest(deepNest, placementResult, dxf = false) {
   var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -78,10 +79,10 @@ function exportNest(deepNest, placementResult, dxf = false) {
     svgheight += 1.1 * sheetbounds.height;
   });
 
-  const { units, scale, mergeLines } = deepNest.config;
+  const { units, scale, mergeLines, dxfExportScale } = deepNest.config();
 
   if (dxf) {
-    scale /= Number(config.getSync("dxfExportScale")); // inkscape on server side
+    scale /= Number(dxfExportScale); // inkscape on server side
   }
 
   if (units == "mm") {
@@ -122,25 +123,22 @@ async function main() {
   const scale = scaleInput * (units === "mm" ? 1 / 25.4 : 1);
   const sheet = { width: 10, height: 10 };
   const filepath = path.resolve("./input/letters3.svg");
-  const [sheetSVG] = deepNest.getParts(
-    Array.from(
-      new DOMParser()
-        .parseFromString(
-          `<svg xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="${
-            sheet.width * scale
-          }" height="${sheet.height * scale}" class="sheet"/></svg>`,
-          "image/svg+xml"
-        )
-        .children.item(0).children
-    )
+  const [sheetSVG] = deepNest.importsvg(
+    null,
+    null,
+    `<svg xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="${
+      sheet.width * scale
+    }" height="${sheet.height * scale}" class="sheet"/></svg>`
   );
   sheetSVG.sheet = true;
-  deepNest.parts.push(sheetSVG);
-  deepNest.importsvg(
+  const elements = deepNest.importsvg(
     path.basename(filepath),
     path.dirname(filepath),
     (await readFile(filepath)).toString()
   );
+  if (elements.length === 0) {
+    throw new Error("Failed to parse svg file");
+  }
   // const parts = deepNest.getParts(
   //   Array.from(
   //     new DOMParser()

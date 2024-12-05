@@ -121,8 +121,8 @@ async function main() {
   const { units, scale: scaleInput } = deepNest.config();
   // scale is stored in units/inch
   const scale = scaleInput * (units === "mm" ? 1 / 25.4 : 1);
-  const sheet = { width: 10, height: 10 };
-  const filepath = path.resolve("./input/letters3.svg");
+  const sheet = { width: 300, height: 100 };
+  const filepath = path.resolve("./input/letters.svg");
   const [sheetSVG] = deepNest.importsvg(
     null,
     null,
@@ -160,25 +160,29 @@ async function main() {
   // );
   // deepNest.parts.push(sheetSVG, ...parts);
 
-  eventEmitter.addEventListener("setPlacements", async ({ detail }) => {
-    if (
-      deepNest.nests.length > 0 &&
-      deepNest.nests[0].fitness <= detail.fitness
-    ) {
-      // result is not better
-      return;
+  eventEmitter.addEventListener(
+    "placement",
+    async ({ detail: { data, accepted } }) => {
+      if (
+        !accepted ||
+        data.placements.flatMap((p) => p.sheetplacements).length <
+          elements.length
+      ) {
+        // result is not better
+        return;
+      }
+      const outputDir = path.resolve("./output");
+      await ensureDir(outputDir);
+      const out = {
+        svg: path.resolve(outputDir, "result.svg"),
+        json: path.resolve(outputDir, "data.json"),
+      };
+      await writeFile(out.svg, exportNest(deepNest, data));
+      await writeFile(out.json, JSON.stringify(data, null, 2));
+      deepNest.stop();
+      console.log("Successfully written files:", out, elements.length);
     }
-    const outputDir = path.resolve("./output");
-    await ensureDir(outputDir);
-    const out = {
-      svg: path.resolve(outputDir, "result.svg"),
-      json: path.resolve(outputDir, "data.json"),
-    };
-    await writeFile(out.svg, exportNest(deepNest, detail));
-    await writeFile(out.json, JSON.stringify(detail, null, 2));
-    deepNest.stop();
-    console.log("Successfully written files:", out);
-  });
+  );
   deepNest.start();
 }
 

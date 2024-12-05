@@ -175,7 +175,7 @@ function processNesting(eventEmitter) {
 		  // run the placement synchronously
 		  function sync(){
 		  	//console.log('starting synchronous calculations', Object.keys(window.nfpCache).length);
-		  	console.log('in sync');
+		  	// console.log('in sync');
 
             // eventEmitter.dispatchEvent(new CustomEvent(('test', {detail: [data.sheets, parts, data.config, index]})));
 		  	var placement = placeParts(data.sheets, parts, data.config, index, eventEmitter);
@@ -184,7 +184,7 @@ function processNesting(eventEmitter) {
 			eventEmitter.dispatchEvent(new CustomEvent('background-response', {detail:placement}));
 		  }
 		  
-		  console.time('Total');
+		//   console.time('Total');
 		  
 		  
 		  if(pairs.length > 0){
@@ -243,8 +243,8 @@ function processNesting(eventEmitter) {
 					db.insert(doc);
 					
 				}
-				console.timeEnd('Total');
-				console.log('before sync');
+				// console.timeEnd('Total');
+				// console.log('before sync');
 				sync();
 			  });
 		  }
@@ -554,8 +554,8 @@ function getOuterNfp(A, B, inside){
 	//console.timeEnd('addon');
 	}
 	else{
-		console.log('minkowski', A.length, B.length, A.source, B.source);
-		console.time('clipper');
+		// console.log('minkowski', A.length, B.length, A.source, B.source);
+		// console.time('clipper');
 	
 		var Ac = toClipperCoordinates(A);
 		ClipperLib.JS.ScaleUpPath(Ac, 10000000);
@@ -587,7 +587,7 @@ function getOuterNfp(A, B, inside){
 		
 		nfp = [clipperNfp];
 		//console.log('clipper nfp', JSON.stringify(nfp));
-		console.timeEnd('clipper');
+		// console.timeEnd('clipper');
 	}
 	
 	if(!nfp || nfp.length == 0){
@@ -694,7 +694,7 @@ function getInnerNfp(A, B, config){
 	
 	if(typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
 		// insert into db
-		console.log('inserting inner: ',A.source, B.source, B.rotation, f);
+		// console.log('inserting inner: ',A.source, B.source, B.rotation, f);
 		var doc = {
 			A: A.source,
 			B: B.source,
@@ -759,7 +759,7 @@ function placeParts(sheets, parts, config, nestindex, eventEmitter){
 		var clipCache = [];
 		//console.log('new sheet');
 		for(i=0; i<parts.length; i++){
-			console.time('placement');
+			// console.time('placement');
 			part = parts[i];
 			
 			// inner NFP
@@ -810,9 +810,9 @@ function placeParts(sheets, parts, config, nestindex, eventEmitter){
 						}
 					}
 				}
-				if(position === null){
-					console.log(sheetNfp);
-				}
+				// if(position === null){
+				// 	console.log(sheetNfp);
+				// }
 				placements.push(position);
 				placed.push(part);
 				
@@ -864,7 +864,7 @@ function placeParts(sheets, parts, config, nestindex, eventEmitter){
 			}
 			
 			if(error || !clipper.Execute(ClipperLib.ClipType.ctUnion, combinedNfp, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero)){
-				console.log('clipper error', error);
+				console.error('clipper error', error);
 				continue;
 			}
 			
@@ -878,7 +878,7 @@ function placeParts(sheets, parts, config, nestindex, eventEmitter){
 				index: placed.length-1
 			};
 			
-			console.log('save cache', placed.length-1);
+			// console.log('save cache', placed.length-1);
 			
 			// difference with sheet polygon
 			var finalNfp = new ClipperLib.Paths();
@@ -1047,7 +1047,7 @@ function placeParts(sheets, parts, config, nestindex, eventEmitter){
 			}
 			//console.log(placednum, totalnum);
 			eventEmitter.dispatchEvent(new CustomEvent('background-progress', { detail: {index: nestindex, progress: 0.5 + 0.5*(placednum/totalnum)}}));
-			console.timeEnd('placement');
+			// console.timeEnd('placement');
 		}
 		
 		//if(minwidth){

@@ -121,7 +121,7 @@ async function main() {
   // scale is stored in units/inch
   const scale = scaleInput * (units === "mm" ? 1 / 25.4 : 1);
   const sheet = { width: 10, height: 10 };
-  const filepath = path.resolve("./input/polygons.svg");
+  const filepath = path.resolve("./input/letters3.svg");
   const [sheetSVG] = deepNest.getParts(
     Array.from(
       new DOMParser()
@@ -135,26 +135,32 @@ async function main() {
     )
   );
   sheetSVG.sheet = true;
-  const parts = deepNest.getParts(
-    Array.from(
-      new DOMParser()
-        .parseFromString((await readFile(filepath)).toString(), "image/svg+xml")
-        .children.item(0).children
-    ).map((g) => {
-      const values = g.firstChild
-        .getAttribute("points")
-        .split(/\s+|,/)
-        .map((q) => Number(q));
-      const points = new Array(values.length / 2)
-        .fill(0)
-        .map((_, i) => ({ x: values[i * 2], y: values[i * 2 + 1] }));
-      return Object.assign(g.firstChild, {
-        points,
-      });
-    }),
-    filepath
+  deepNest.parts.push(sheetSVG);
+  deepNest.importsvg(
+    path.basename(filepath),
+    path.dirname(filepath),
+    (await readFile(filepath)).toString()
   );
-  deepNest.parts.push(sheetSVG, ...parts);
+  // const parts = deepNest.getParts(
+  //   Array.from(
+  //     new DOMParser()
+  //       .parseFromString((await readFile(filepath)).toString(), "image/svg+xml")
+  //       .children.item(0).children
+  //   ).map((g) => {
+  //     const values = g.firstChild
+  //       .getAttribute("points")
+  //       .split(/\s+|,/)
+  //       .map((q) => Number(q));
+  //     const points = new Array(values.length / 2)
+  //       .fill(0)
+  //       .map((_, i) => ({ x: values[i * 2], y: values[i * 2 + 1] }));
+  //     return Object.assign(g.firstChild, {
+  //       points,
+  //     });
+  //   }),
+  //   filepath
+  // );
+  // deepNest.parts.push(sheetSVG, ...parts);
 
   eventEmitter.addEventListener("setPlacements", async ({ detail }) => {
     if (

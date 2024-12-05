@@ -260,10 +260,11 @@
 				openpaths.push(p);
 			}
 			else if(p.tagName == 'path'){
-				var lastCommand = p.pathSegList.getItem(p.pathSegList.numberOfItems-1).pathSegTypeAsLetter;
+				const pathSegList = p.pathSegList || (p.pathSegList=new window.SVGPathSegList(p));
+				var lastCommand = pathSegList.getItem(pathSegList.numberOfItems-1).pathSegTypeAsLetter;
 				if(lastCommand != 'z' && lastCommand != 'Z'){
 					// endpoints are actually far apart
-					p.pathSegList.appendItem(p.createSVGPathSegClosePath());
+					pathSegList.appendItem(p.createSVGPathSegClosePath());
 				}
 			}
 		}
@@ -836,8 +837,9 @@
 		}
 		
 		if(p.tagName == 'path'){
-			for(var j=0; j<p.pathSegList.numberOfItems; j++){
-				var c = p.pathSegList.getItem(j);
+			const pathSegList = p.pathSegList || (p.pathSegList=new window.SVGPathSegList(p));
+			for(var j=0; j<pathSegList.numberOfItems; j++){
+				var c = pathSegList.getItem(j);
 				if(c.pathSegTypeAsLetter == 'z' || c.pathSegTypeAsLetter == 'Z'){
 					return true;
 				}
@@ -1280,7 +1282,7 @@
 			return false;
 		}
 				
-		var seglist = path.pathSegList;
+		var seglist = path.pathSegList || (path.pathSegList=new window.SVGPathSegList(path));
 		
 		var x=0, y=0, x0=0, y0=0;
 		var paths = [];
@@ -1299,7 +1301,8 @@
 			return false; // only 1 M command, no need to split
 		}
 		
-		for(i=0; i<seglist.numberOfItems; i++){
+		const n = seglist.numberOfItems;
+		for(i=0; i<n; i++){
 			var s = seglist.getItem(i);
 			var command = s.pathSegTypeAsLetter;
 			if(command == 'M' || command == 'm'){
@@ -1312,20 +1315,20 @@
 			  if ('x' in s) x=s.x;
 			  if ('y' in s) y=s.y;
 			  
-			  p.pathSegList.appendItem(s);
+			  seglist.appendItem(s);
 			}
 			else{
 				if ('x'  in s) x+=s.x;
 				if ('y'  in s) y+=s.y;
 				if(command == 'm'){
-					p.pathSegList.appendItem(path.createSVGPathSegMovetoAbs(x,y));
+					seglist.appendItem(path.createSVGPathSegMovetoAbs(x,y));
 				}
 				else{
 					if(command == 'Z' || command == 'z'){
 						x = x0;
 						y = y0;
 					}
-					p.pathSegList.appendItem(s);
+					seglist.appendItem(s);
 				}
 			}
 			// Record the start of a subpath
@@ -1337,7 +1340,7 @@
 		var addedPaths = [];
 		for(i=0; i<paths.length; i++){
 			// don't add trivial paths from sequential M commands
-			if(paths[i].pathSegList.numberOfItems > 1){
+			if((paths[i].pathSegList || new window.SVGPathSegList(paths[i])).numberOfItems > 1){
 				path.parentElement.insertBefore(paths[i], path);
 				addedPaths.push(paths[i]);
 			}
@@ -1457,10 +1460,8 @@
 	
 	SvgParser.prototype.polygonifyPath = function(path){
 		// we'll assume that splitpath has already been run on this path, and it only has one M/m command 
-		var seglist = path.pathSegList;
+		var seglist = path.pathSegList || (path.pathSegListnew = window.SVGPathSegList(path));
 		var poly = [];
-		var firstCommand = seglist.getItem(0);
-		var lastCommand = seglist.getItem(seglist.numberOfItems-1);
 
 		var x=0, y=0, x0=0, y0=0, x1=0, y1=0, x2=0, y2=0, prevx=0, prevy=0, prevx1=0, prevy1=0, prevx2=0, prevy2=0;
 		

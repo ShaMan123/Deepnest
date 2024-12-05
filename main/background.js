@@ -3,9 +3,7 @@
 const { GeometryUtil } = require('./util/geometryutil');
 const ClipperLib = require('./util/clipper');
 const d3 = require('./util/d3-polygon');
-const Parallel = require('./util/parallel');
 const { calculateNFP } = require('bindings')('addon.node');
-const path = require('path');
 const { processPairs } = require('./processPairs');
 
 
@@ -110,14 +108,7 @@ const nfpcache = {}
  * 
  * @param {EventTarget} eventEmitter 
  */
-function processNesting(eventEmitter) {
-
-/*
-add package 'filequeue 0.5.0' if you enable this
-	window.FileQueue = require('filequeue');
-	window.fq = new FileQueue(500);
-*/	
-	  
+function processNesting(eventEmitter) {  
 	eventEmitter.addEventListener('background-start', ({ detail: data }) => {
 		var index = data.index;
 	    var individual = data.individual;
@@ -179,92 +170,14 @@ add package 'filequeue 0.5.0' if you enable this
 			}
 		}
 		
-		console.log('pairs: ',pairs.length);
-		  
-		  var process = function(pair){
-			
-			var A = rotatePolygon(pair.A, pair.Arotation);
-			var B = rotatePolygon(pair.B, pair.Brotation);
-			
-			var clipper = new ClipperLib.Clipper();
-			
-			var Ac = toClipperCoordinates(A);
-			ClipperLib.JS.ScaleUpPath(Ac, 10000000);
-			var Bc = toClipperCoordinates(B);
-			ClipperLib.JS.ScaleUpPath(Bc, 10000000);
-			for(var i=0; i<Bc.length; i++){
-				Bc[i].X *= -1;
-				Bc[i].Y *= -1;
-			}
-			var solution = ClipperLib.Clipper.MinkowskiSum(Ac, Bc, true);
-			var clipperNfp;
-		
-			var largestArea = null;
-			for(i=0; i<solution.length; i++){
-				var n = toNestCoordinates(solution[i], 10000000);
-				var sarea = -GeometryUtil.polygonArea(n);
-				if(largestArea === null || largestArea < sarea){
-					clipperNfp = n;
-					largestArea = sarea;
-				}
-			}
-			
-			for(var i=0; i<clipperNfp.length; i++){
-				clipperNfp[i].x += B[0].x;
-				clipperNfp[i].y += B[0].y;
-			}
-			
-			pair.A = null;
-			pair.B = null;
-			pair.nfp = clipperNfp;
-			return pair;
-			
-			function toClipperCoordinates(polygon){
-				var clone = [];
-				for(var i=0; i<polygon.length; i++){
-					clone.push({
-						X: polygon[i].x,
-						Y: polygon[i].y
-					});
-				}
-	
-				return clone;
-			};
-			
-			function toNestCoordinates(polygon, scale){
-				var clone = [];
-				for(var i=0; i<polygon.length; i++){
-					clone.push({
-						x: polygon[i].X/scale,
-						y: polygon[i].Y/scale
-					});
-				}
-	
-				return clone;
-			};
-			
-			function rotatePolygon(polygon, degrees){
-				var rotated = [];
-				var angle = degrees * Math.PI / 180;
-				for(var i=0; i<polygon.length; i++){
-					var x = polygon[i].x;
-					var y = polygon[i].y;
-					var x1 = x*Math.cos(angle)-y*Math.sin(angle);
-					var y1 = x*Math.sin(angle)+y*Math.cos(angle);
-						
-					rotated.push({x:x1, y:y1});
-				}
-	
-				return rotated;
-			};
-		  }
+		// console.log('pairs: ',pairs.length);
 		  
 		  // run the placement synchronously
 		  function sync(){
 		  	//console.log('starting synchronous calculations', Object.keys(window.nfpCache).length);
 		  	console.log('in sync');
 
-            eventEmitter.dispatchEvent(new CustomEvent(('test', {detail: [data.sheets, parts, data.config, index]})));
+            // eventEmitter.dispatchEvent(new CustomEvent(('test', {detail: [data.sheets, parts, data.config, index]})));
 		  	var placement = placeParts(data.sheets, parts, data.config, index, eventEmitter);
 	
 			placement.index = data.index;

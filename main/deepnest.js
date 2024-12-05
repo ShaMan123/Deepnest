@@ -661,11 +661,13 @@
 				
 				var poly = SvgParser.polygonify(paths[i]);
 				poly = this.cleanPolygon(poly);
-				
+
 				// todo: warn user if poly could not be processed and is excluded from the nest
 				if(poly && poly.length > 2 && Math.abs(GeometryUtil.polygonArea(poly)) > config.curveTolerance*config.curveTolerance){
 					poly.source = i;
 					polygons.push(poly);
+				} else {
+					console.warn('Excluding poly', poly, paths[i])
 				}
 			}
 						
@@ -1011,12 +1013,11 @@
 				}
 			}
 			
-			var self = this;
 			this.working = true;
 			
 			if(!workerTimer){
-				workerTimer = setInterval(function(){
-					self.launchWorkers.call(self, parts, config, progressCallback, displayCallback);
+				workerTimer = setInterval(() => {
+					this.launchWorkers.call(this, parts, config, progressCallback, displayCallback);
 					//progressCallback(progress);
 				}, 100);
 			}

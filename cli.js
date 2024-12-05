@@ -161,6 +161,14 @@ async function main() {
   // deepNest.parts.push(sheetSVG, ...parts);
 
   eventEmitter.addEventListener(
+    "background-progress",
+    ({ detail: { index, progress } }) => {
+      progress >= 0 &&
+        console.info(`iteration(${index}) at ${Math.round(progress * 100)}%`);
+    }
+  );
+
+  eventEmitter.addEventListener(
     "placement",
     async ({ detail: { data, accepted } }) => {
       if (
@@ -171,6 +179,7 @@ async function main() {
         // result is not better
         return;
       }
+      deepNest.stop();
       const outputDir = path.resolve("./output");
       await ensureDir(outputDir);
       const out = {
@@ -179,10 +188,14 @@ async function main() {
       };
       await writeFile(out.svg, exportNest(deepNest, data));
       await writeFile(out.json, JSON.stringify(data, null, 2));
-      deepNest.stop();
-      console.log("Successfully written files:", out, elements.length);
+      console.log(
+        `Successfully nested ${elements.length} elements\n`,
+        "Results:",
+        out
+      );
     }
   );
+
   deepNest.start();
 }
 

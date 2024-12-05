@@ -1024,8 +1024,8 @@
 		}
 		
 		this.eventEmitter.addEventListener('background-response', ({ detail: payload }) => {
-			const accepted = this.nests.length == 0 || this.nests[0].fitness > payload.fitness;
-			this.eventEmitter.dispatchEvent(new CustomEvent("placement", { detail: { data: payload, accepted } }));
+			const better = this.nests.length == 0 || this.nests[0].fitness > payload.fitness;
+			this.eventEmitter.dispatchEvent(new CustomEvent("placement", { detail: { data: payload, better } }));
 			// console.log('ipc response',payload);
 			if(!GA){
 				// user might have quit while we're away
@@ -1035,7 +1035,7 @@
 			GA.population[payload.index].fitness = payload.fitness;
 			
 			// render placement
-			if(accepted){
+			if(better){
 				this.nests.unshift(payload);
 				
 				if(this.nests.length > 10){

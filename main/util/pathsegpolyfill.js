@@ -7,7 +7,7 @@
 
 (function() { "use strict";
     if(!("SVGPathElement" in window)) {
-        window.SVGPathElement = class SVGPathElement {
+        window.SVGPathElement = class SVGPathElement extends window.HTMLElement {
             
         }
     }

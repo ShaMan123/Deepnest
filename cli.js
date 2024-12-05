@@ -114,13 +114,18 @@ function exportNest(deepNest, placementResult, dxf = false) {
   return new XMLSerializer().serializeToString(svg);
 }
 
-async function main({
-  iterations = 1,
-  units = "mm",
-  scale = 72,
-  spacing = 4,
-  ...config
-} = {}) {
+async function main(
+  inputFiles,
+  callback,
+  {
+    iterations = 1,
+    units = "mm",
+    scale = 72,
+    spacing = 4,
+    sheet = { width: 3000, height: 1000 },
+    ...config
+  } = {}
+) {
   // scale is stored in units/inch
   const ratio = units === "mm" ? 1 / 25.4 : 1;
   const deepNestConfig = {
@@ -145,8 +150,6 @@ async function main({
   };
   const deepNest = new DeepNest(eventEmitter, deepNestConfig);
   processNesting(eventEmitter);
-  const sheet = { width: 300, height: 100 };
-  const filepath = path.resolve("./input/letters.svg");
   const [sheetSVG] = deepNest.importsvg(
     null,
     null,
@@ -155,11 +158,17 @@ async function main({
     }" height="${sheet.height * ratio * scale}" class="sheet"/></svg>`
   );
   sheetSVG.sheet = true;
-  const elements = deepNest.importsvg(
-    path.basename(filepath),
-    path.dirname(filepath),
-    (await readFile(filepath)).toString()
-  );
+  const elements = (
+    await Promise.all(
+      inputFiles.map(async (filepath) =>
+        deepNest.importsvg(
+          path.basename(filepath),
+          path.dirname(filepath),
+          (await readFile(filepath)).toString()
+        )
+      )
+    )
+  ).flat();
   if (elements.length === 0) {
     throw new Error("Failed to parse svg file");
   }
@@ -195,7 +204,7 @@ async function main({
   let i = 0;
   eventEmitter.addEventListener(
     "placement",
-    async ({ detail: { data, accepted } }) => {
+    ({ detail: { data, accepted } }) => {
       if (
         !accepted ||
         data.placements.flatMap((p) => p.sheetplacements).length <
@@ -205,18 +214,16 @@ async function main({
         return;
       }
       ++i === iterations && deepNest.stop();
-      const outputDir = path.resolve("./output");
-      await ensureDir(outputDir);
-      const out = {
-        svg: path.resolve(outputDir, `result${i}.svg`),
-        json: path.resolve(outputDir, `data${i}.json`),
-      };
-      await writeFile(out.svg, exportNest(deepNest, data));
-      await writeFile(out.json, JSON.stringify(data, null, 2));
-      console.log(
-        `Successfully nested ${elements.length} elements\n`,
-        "Results:",
-        out
+      return callback(
+        {
+          iteration: i,
+          result: data.placements.flatMap(({ sheetplacements }) =>
+            sheetplacements.slice().sort((a, b) => a.id - b.id)
+          ),
+          data,
+          elements,
+        },
+        deepNest
       );
     }
   );
@@ -224,4 +231,17 @@ async function main({
   deepNest.start();
 }
 
-main();
+main(
+  ["./input/letters.svg", "./input/letters2.svg"],
+  async ({ iteration: i, result, data, elements }, deepNest) => {
+    const outputDir = path.resolve("./output");
+    await ensureDir(outputDir);
+    const out = {
+      svg: path.resolve(outputDir, `result-${i}.svg`),
+      json: path.resolve(outputDir, `data-${i}.json`),
+    };
+    await writeFile(out.svg, exportNest(deepNest, data));
+    await writeFile(out.json, JSON.stringify(result, null, 2));
+    console.log(`Successfully nested ${elements.length} elements:`, out);
+  }
+);

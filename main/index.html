@@ -49,8 +49,8 @@
 		eventEmitter.addEventListener("background-start", ({ detail: payload }) => {
 			ipcRenderer.send("background-start", payload);
 		});
-		eventEmitter.addEventListener("setPlacements", ({ detail: payload }) => {
-			ipcRenderer.send("setPlacements", payload);
+		eventEmitter.addEventListener("placement", ({ detail: payload }) => {
+			ipcRenderer.send("placement", payload);
 		});
 
 		const deepNest = window.DeepNest = new DeepNest(eventEmitter);

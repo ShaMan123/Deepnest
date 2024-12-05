@@ -273,8 +273,8 @@ ipcMain.on('purchase-success', function(event){
 	mainWindow.webContents.send('purchase-success');
 });
 
-ipcMain.on("setPlacements", (event, payload) => {
-  global.exportedPlacements = payload;
+ipcMain.on("placement", (event, payload) => {
+  global.exportedPlacements = payload.data;
 });
 
 ipcMain.on("test", (event, payload) => {

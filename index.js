@@ -111,6 +111,7 @@ async function nest(
     scale = 72,
     spacing = 4,
     sheet = { width: 3000, height: 1000 },
+    timeout = 0,
     ...config
   } = {}
 ) {
@@ -160,26 +161,6 @@ async function nest(
   if (elements.length === 0) {
     throw new Error("Nothing to nest");
   }
-  // const parts = deepNest.getParts(
-  //   Array.from(
-  //     new DOMParser()
-  //       .parseFromString((await readFile(filepath)).toString(), "image/svg+xml")
-  //       .children.item(0).children
-  //   ).map((g) => {
-  //     const values = g.firstChild
-  //       .getAttribute("points")
-  //       .split(/\s+|,/)
-  //       .map((q) => Number(q));
-  //     const points = new Array(values.length / 2)
-  //       .fill(0)
-  //       .map((_, i) => ({ x: values[i * 2], y: values[i * 2 + 1] }));
-  //     return Object.assign(g.firstChild, {
-  //       points,
-  //     });
-  //   }),
-  //   filepath
-  // );
-  // deepNest.parts.push(sheetSVG, ...parts);
 
   eventEmitter.addEventListener(
     "background-progress",
@@ -188,6 +169,8 @@ async function nest(
         console.info(`iteration(${index}) at ${Math.round(progress * 100)}%`);
     }
   );
+
+  const t = timeout && setTimeout(() => deepNest.stop(), timeout);
 
   let i = 0;
   eventEmitter.addEventListener(
@@ -201,7 +184,12 @@ async function nest(
         // result is not better
         return;
       }
-      ++i === iterations && deepNest.stop();
+
+      if (++i === iterations) {
+        clearTimeout(t);
+        deepNest.stop();
+      }
+
       return callback(
         {
           iteration: i,
@@ -215,6 +203,11 @@ async function nest(
       );
     }
   );
+
+  process.once("SIGINT", () => {
+    clearTimeout(t);
+    deepNest.stop();
+  });
 
   deepNest.start();
 }

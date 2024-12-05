@@ -24,6 +24,12 @@ async function main() {
       await writeFile(out.svg, nestingToSVG(deepNest, data));
       await writeFile(out.json, JSON.stringify(result, null, 2));
       console.log(`Successfully nested ${elements.length} elements:`, out);
+    },
+    {
+      iterations: 1,
+      timeout: 10_000,
+      spacing: 0,
+      sheet: { width: 100, height: 50 },
     }
   );
 }

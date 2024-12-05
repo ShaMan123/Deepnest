@@ -6,7 +6,7 @@ Object.assign(global, { DOMParser, XMLSerializer, window, document });
 
 const { DeepNest } = require("./main/deepnest");
 const SvgParser = require("./main/svgparser");
-const { processNesting } = require("./main/background");
+const { Worker } = require("worker_threads");
 const { readFile, writeFile } = require("fs/promises");
 const path = require("path");
 
@@ -42,6 +42,14 @@ function nestingToSVG(deepNest, placementResult, dxf = false) {
 
       part.svgelements.forEach(function (e, index) {
         var node = e.cloneNode(false);
+        if (
+          (node.tagName === "polyline" || node.tagName === "polygon") &&
+          !node.points
+        ) {
+          node.points = SvgParser.parsePolyPoints(node);
+        } else if (node.tagName === "path") {
+          Object.setPrototypeOf(node, window.SVGPathElement.prototype);
+        }
 
         if (placementResult.tagName == "image") {
           var relpath = placementResult.getAttribute("data-href");
@@ -67,7 +75,8 @@ function nestingToSVG(deepNest, placementResult, dxf = false) {
     svgheight += 1.1 * sheetbounds.height;
   });
 
-  const { units, scale, mergeLines, dxfExportScale } = deepNest.config();
+  const { units, scale, mergeLines, dxfExportScale, curveTolerance } =
+    deepNest.config();
   const ratio =
     (units === "mm" ? 1 / 25.4 : 1) /
     // inkscape on server side
@@ -87,7 +96,7 @@ function nestingToSVG(deepNest, placementResult, dxf = false) {
     SvgParser.applyTransform(svg);
     SvgParser.flatten(svg);
     SvgParser.splitLines(svg);
-    SvgParser.mergeOverlap(svg, 0.1 * config.getSync("curveTolerance"));
+    SvgParser.mergeOverlap(svg, 0.1 * curveTolerance);
     SvgParser.mergeLines(svg);
 
     // set stroke and fill for all
@@ -138,7 +147,13 @@ async function nest(
     conversionServer: "http://convert.deepnest.io",
   };
   const deepNest = new DeepNest(eventEmitter, deepNestConfig);
-  processNesting(eventEmitter);
+  const worker = new Worker(path.resolve("./main/background.js"));
+  eventEmitter.addEventListener("background-start", ({ detail: data }) =>
+    worker.postMessage(data)
+  );
+  worker.on("message", ({ type, data }) =>
+    eventEmitter.dispatchEvent(new CustomEvent(type, { detail: data }))
+  );
   const [sheetSVG] = deepNest.importsvg(
     null,
     null,
@@ -170,12 +185,19 @@ async function nest(
     }
   );
 
-  const t = timeout && setTimeout(() => deepNest.stop(), timeout);
+  let t = 0;
+  const abort = async () => {
+    clearTimeout(t);
+    deepNest.stop();
+    await worker.terminate();
+  };
+  t = timeout && setTimeout(abort, timeout);
+  process.on("SIGINT", abort);
 
   let i = 0;
   eventEmitter.addEventListener(
     "placement",
-    ({ detail: { data, accepted } }) => {
+    async ({ detail: { data, accepted } }) => {
       if (
         !accepted ||
         data.placements.flatMap((p) => p.sheetplacements).length <
@@ -186,8 +208,7 @@ async function nest(
       }
 
       if (++i === iterations) {
-        clearTimeout(t);
-        deepNest.stop();
+        await abort();
       }
 
       return callback(
@@ -204,12 +225,9 @@ async function nest(
     }
   );
 
-  process.once("SIGINT", () => {
-    clearTimeout(t);
-    deepNest.stop();
-  });
-
   deepNest.start();
+
+  return abort;
 }
 
 module.exports = { nest, nestingToSVG };

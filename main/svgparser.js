@@ -39,6 +39,17 @@
 		this.conf.tolerance = Number(config.tolerance);
 		this.conf.endpointTolerance = Number(config.endpointTolerance);
 	}
+
+	const polyPointsSplitRE = /\s+|,/
+	SvgParser.prototype.parsePolyPoints = (poly) => {
+		const values = poly.getAttribute('points')
+			.split(polyPointsSplitRE)
+			.map((q) => Number(q));
+		const points = new Array(values.length / 2)
+			.fill(0)
+			.map((_, i) => ({ x: values[i * 2], y: values[i * 2 + 1] }));
+		return points
+	}
 	
 	SvgParser.prototype.load = function(dirpath, svgString, scale, scalingFactor){
 	
@@ -68,13 +79,7 @@
 			svg.querySelectorAll('polygon, polyline').forEach(poly => {
 				const value = poly.getAttribute('points');
 				if (typeof value === 'string') {
-					const values = value
-					  .split(/\s+|,/)
-					  .map((q) => Number(q));
-					const points = new Array(values.length / 2)
-					  .fill(0)
-					  .map((_, i) => ({ x: values[i * 2], y: values[i * 2 + 1] }))
-					poly.points = points;
+					poly.points = this.parsePolyPoints(poly);
 				}
 			});
 			this.svgRoot = root;
@@ -741,7 +746,8 @@
 		var topath = function(svg, p){
 			if(p.tagName == 'line'){
 				const pa = svg.createElementNS('http://www.w3.org/2000/svg', 'path');
-				const pathSegList = pa.pathSegList || (pa.pathSegList = new window.SVGPathSegList(pa));
+				Object.setPrototypeOf(pa, window.SVGPathElement.prototype);
+				const pathSegList = pa.pathSegList;
 				pathSegList.appendItem(pa.createSVGPathSegMovetoAbs(Number(p.getAttribute('x1')),Number(p.getAttribute('y1'))));
 				pathSegList.appendItem(pa.createSVGPathSegLinetoAbs(Number(p.getAttribute('x2')),Number(p.getAttribute('y2'))));
 
@@ -753,7 +759,8 @@
 					return null;
 				}
 				const pa = svg.createElementNS('http://www.w3.org/2000/svg', 'path');
-				const pathSegList = pa.pathSegList || (pa.pathSegList = new window.SVGPathSegList(pa));
+				Object.setPrototypeOf(pa, window.SVGPathElement.prototype);
+				const pathSegList = pa.pathSegList;
 				pathSegList.appendItem(pa.createSVGPathSegMovetoAbs(p.points[0].x,p.points[0].y));
 				for(var i=1; i<p.points.length; i++){
 					pathSegList.appendItem(pa.createSVGPathSegLinetoAbs(p.points[i].x,p.points[i].y));
@@ -762,7 +769,7 @@
 			}
 
 			if(p.tagName === 'path') {
-				p.pathSegList || (p.pathSegList = new window.SVGPathSegList(p));
+				Object.setPrototypeOf(p, window.SVGPathElement.prototype);
 				return p;
 			}
 			
@@ -1244,8 +1251,9 @@
 						element.setAttribute('transform', transformString);
 						return;
 					}
-					for(var i=0; i<element.points.length; i++){
-						var point = element.points[i];
+					const points = element.points;
+					for(var i=0; i<points.length; i++){
+						var point = points[i];
 						var transformed = transform.calc(point.x, point.y);
 						point.x = transformed[0];
 						point.y = transformed[1];
@@ -1576,6 +1584,7 @@
 		clean: parser.cleanInput.bind(parser),
 		polygonify: parser.polygonify.bind(parser),
 		polygonifyPath: parser.polygonifyPath.bind(parser),
+		parsePolyPoints: parser.parsePolyPoints,
 		isClosed: parser.isClosed.bind(parser),
 		applyTransform: parser.applyTransform.bind(parser),
 		transformParse: parser.transformParse.bind(parser),

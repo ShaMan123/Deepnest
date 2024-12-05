@@ -115,7 +115,6 @@ async function nest(
   svgInput,
   callback,
   {
-    iterations = 1,
     units = "mm",
     scale = 72,
     spacing = 4,
@@ -179,9 +178,11 @@ async function nest(
 
   eventEmitter.addEventListener(
     "background-progress",
-    ({ detail: { index, progress } }) => {
+    ({ detail: { message = "", index, progress } }) => {
       progress >= 0 &&
-        console.info(`iteration(${index}) at ${Math.round(progress * 100)}%`);
+        console.info(
+          `iteration(${index}): ${Math.round(progress * 100)}% ${message}`
+        );
     }
   );
 
@@ -194,40 +195,26 @@ async function nest(
   t = timeout && setTimeout(abort, timeout);
   process.on("SIGINT", abort);
 
-  let i = 0;
-  eventEmitter.addEventListener(
-    "placement",
-    async ({ detail: { data, accepted } }) => {
-      if (
-        !accepted ||
-        data.placements.flatMap((p) => p.sheetplacements).length <
-          elements.length
-      ) {
-        // result is not better
-        return;
-      }
-
-      if (++i === iterations) {
-        await abort();
-      }
-
-      return callback(
-        {
-          iteration: i,
-          result: data.placements.flatMap(({ sheetplacements }) =>
-            sheetplacements.slice().sort((a, b) => a.id - b.id)
-          ),
-          data,
-          elements,
-        },
-        deepNest
-      );
-    }
-  );
+  eventEmitter.addEventListener("placement", ({ detail: { data, better } }) => {
+    return callback({
+      iteration: data.index,
+      result: data.placements.flatMap(({ sheetplacements }) =>
+        sheetplacements.slice().sort((a, b) => a.id - b.id)
+      ),
+      data,
+      elements,
+      better,
+      complete:
+        data.placements.flatMap((p) => p.sheetplacements).length ===
+        elements.length,
+      svg: () => nestingToSVG(deepNest, data),
+      abort,
+    });
+  });
 
   deepNest.start();
 
   return abort;
 }
 
-module.exports = { nest, nestingToSVG };
+module.exports = { nest };

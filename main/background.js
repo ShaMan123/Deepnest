@@ -6,6 +6,7 @@ const d3 = require('./util/d3-polygon');
 const { calculateNFP } = require('bindings')('addon.node');
 const { Worker, parentPort } = require('node:worker_threads');
 const path = require('path');
+const os = require('os');
 
 function clone(nfp){
 	var newnfp = [];
@@ -104,7 +105,7 @@ const db = {
 
 const nfpcache = {}
 
-function processPairs(pairs, { signal, threadCount = 1 } = {}) {
+function processPairs(pairs, { index, signal, threadCount = os.cpus().length } = {}) {
 	return new Promise((resolve, reject) => {
 		const result = [];
 		const threads = new Set();
@@ -122,11 +123,12 @@ function processPairs(pairs, { signal, threadCount = 1 } = {}) {
 					console.log('Pair processing completed');
 					result.length === pairs.length ? resolve(result) : reject(`Error while processing pairs, expected ${pairs.length} received ${result.length}`);
 				} else {
-					console.log(`Thread exiting, ${threads.size} running...`);
+					// console.log(`Thread exiting, ${threads.size} running...`);
 				}
 			});
 			worker.on("message", (data) => {
 				result.push(...data);
+				parentPort.postMessage({ type: 'background-progress', data: { message: 'ready', index, progress: result.length / pairs.length } })
 			});
 			threads.add(worker);
 		}
@@ -220,7 +222,7 @@ function attach() {
 		  
 		  
 		  if(pairs.length > 0){
-			return processPairs(pairs, { threadCount: 4 })
+			return processPairs(pairs, { index })
 				.then(function(processed){
 			  	 function getPart(source){
 					for(var k=0; k<parts.length; k++){

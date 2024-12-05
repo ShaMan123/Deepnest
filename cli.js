@@ -80,21 +80,20 @@ function exportNest(deepNest, placementResult, dxf = false) {
   });
 
   const { units, scale, mergeLines, dxfExportScale } = deepNest.config();
+  const ratio =
+    (units === "mm" ? 1 / 25.4 : 1) /
+    // inkscape on server side
+    (dxf ? dxfExportScale : 1);
 
-  if (dxf) {
-    scale /= Number(dxfExportScale); // inkscape on server side
-  }
-
-  if (units == "mm") {
-    scale /= 25.4;
-  }
-
-  svg.setAttribute("width", svgwidth / scale + (units == "inch" ? "in" : "mm"));
+  svg.setAttribute(
+    "width",
+    `${svgwidth / (scale * ratio)}${units == "inch" ? "in" : "mm"}`
+  );
   svg.setAttribute(
     "height",
-    svgheight / scale + (units == "inch" ? "in" : "mm")
+    `${svgheight / (scale * ratio)}${units == "inch" ? "in" : "mm"}`
   );
-  svg.setAttribute("viewBox", "0 0 " + svgwidth + " " + svgheight);
+  svg.setAttribute("viewBox", `0 0 ${svgwidth} ${svgheight}`);
 
   if (mergeLines && placementResult.mergedLength > 0) {
     SvgParser.applyTransform(svg);
@@ -115,20 +114,45 @@ function exportNest(deepNest, placementResult, dxf = false) {
   return new XMLSerializer().serializeToString(svg);
 }
 
-async function main() {
-  const deepNest = new DeepNest(eventEmitter);
-  processNesting(eventEmitter);
-  const { units, scale: scaleInput } = deepNest.config();
+async function main({
+  iterations = 1,
+  units = "mm",
+  scale = 72,
+  spacing = 4,
+  ...config
+} = {}) {
   // scale is stored in units/inch
-  const scale = scaleInput * (units === "mm" ? 1 / 25.4 : 1);
+  const ratio = units === "mm" ? 1 / 25.4 : 1;
+  const deepNestConfig = {
+    ...config,
+    units,
+    scale,
+    spacing: spacing * ratio * scale, // stored value will be in units/inch
+    curveTolerance: 0.72, // store distances in native units
+    clipperScale: 10000000,
+    rotations: 4,
+    threads: 4,
+    populationSize: 10,
+    mutationRate: 10,
+    placementType: "gravity", // how to place each part (possible values gravity, box, convexhull)
+    mergeLines: true, // whether to merge lines
+    timeRatio: 0.5, // ratio of material reduction to laser time. 0 = optimize material only, 1 = optimize laser time only
+    simplify: false,
+    dxfImportScale: 1,
+    dxfExportScale: 72,
+    endpointTolerance: 0.36,
+    conversionServer: "http://convert.deepnest.io",
+  };
+  const deepNest = new DeepNest(eventEmitter, deepNestConfig);
+  processNesting(eventEmitter);
   const sheet = { width: 300, height: 100 };
   const filepath = path.resolve("./input/letters.svg");
   const [sheetSVG] = deepNest.importsvg(
     null,
     null,
     `<svg xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="${
-      sheet.width * scale
-    }" height="${sheet.height * scale}" class="sheet"/></svg>`
+      sheet.width * ratio * scale
+    }" height="${sheet.height * ratio * scale}" class="sheet"/></svg>`
   );
   sheetSVG.sheet = true;
   const elements = deepNest.importsvg(
@@ -168,6 +192,7 @@ async function main() {
     }
   );
 
+  let i = 0;
   eventEmitter.addEventListener(
     "placement",
     async ({ detail: { data, accepted } }) => {
@@ -179,12 +204,12 @@ async function main() {
         // result is not better
         return;
       }
-      deepNest.stop();
+      ++i === iterations && deepNest.stop();
       const outputDir = path.resolve("./output");
       await ensureDir(outputDir);
       const out = {
-        svg: path.resolve(outputDir, "result.svg"),
-        json: path.resolve(outputDir, "data.json"),
+        svg: path.resolve(outputDir, `result${i}.svg`),
+        json: path.resolve(outputDir, `data${i}.json`),
       };
       await writeFile(out.svg, exportNest(deepNest, data));
       await writeFile(out.json, JSON.stringify(data, null, 2));

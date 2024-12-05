@@ -64,6 +64,20 @@
 			var root = svg.firstElementChild;
 			
 			this.svg = svg;
+			svg.querySelectorAll('path').forEach(path => path instanceof window.SVGPathElement || Object.setPrototypeOf(path, window.SVGPathElement.prototype))
+			svg.querySelectorAll('polygon, polyline').forEach(poly => {
+				const value = poly.getAttribute('points');
+				if (typeof value === 'string') {
+					const values = value
+					  .split(/\s+|,/)
+					  .map((q) => Number(q));
+					const points = new Array(values.length / 2)
+					  .fill(0)
+					  .map((_, i) => ({ x: values[i * 2], y: values[i * 2 + 1] }))
+					poly.setAttribute('points', points);
+					poly.points = points;
+				}
+			});
 			this.svgRoot = root;
 			
 			// get local scaling factor from svg root "width" dimension
@@ -162,18 +176,18 @@
 		this.filter(this.allowedElements);
 		
 		this.imagePaths(this.svgRoot);
-		//console.log(this.svgRoot);
+		// console.log(this.svgRoot);
 		
 		// split any compound paths into individual path elements
 		this.recurse(this.svgRoot, this.splitPath);
-		//console.log(this.svgRoot);
+		// console.log(this.svgRoot);
 		
 		// this kills overlapping lines, but may have unexpected edge cases
 		// eg. open paths that share endpoints with segments of closed paths
 		/*this.splitLines(this.svgRoot);
 		
 		this.mergeOverlap(this.svgRoot, 0.1*this.conf.toleranceSvg);*/
-		
+
 		// merge open paths into closed paths
 		// for numerically accurate exports
 		this.mergeLines(this.svgRoot, this.conf.toleranceSvg);
@@ -1277,77 +1291,58 @@
 	
 	// split a compound path (paths with M, m commands) into an array of paths
 	SvgParser.prototype.splitPath = function(path){
-		if(!path || path.tagName != 'path' || !path.parentElement){
-			return false;
+		if(path?.tagName != 'path' || !path.parentElement){
+			return null;
 		}
 				
-		var seglist = path.pathSegList || (path.pathSegList = new window.SVGPathSegList(path));
-		
-		var x=0, y=0, x0=0, y0=0;
-		var paths = [];
-		
-		var p;
-		
-		var lastM = 0;
-		for(var i=seglist.numberOfItems-1; i>=0; i--){
-			if(i > 0 && seglist.getItem(i).pathSegTypeAsLetter == 'M' || seglist.getItem(i).pathSegTypeAsLetter == 'm'){
-				lastM = i;
-				break;
+		const seglist = path.pathSegList || (path.pathSegList = new window.SVGPathSegList(path));
+		const indices = [];
+
+		for (let index = 0, x = 0, y = 0; index < seglist.numberOfItems; index++) {
+			const { pathSegTypeAsLetter: cmd, x: sx, y: sy } = seglist.getItem(index);
+			if (cmd === 'Z' || cmd === 'z') {
+				const m = indices[indices.length - 1];
+				x += m.x;
+				y += m.y;
+			} else if (cmd === cmd.toLowerCase()) {
+				// rel
+				x += sx;
+				y += sy;
+			} else {
+				// abs
+				x = sx;
+				y = sy;
+			}
+			if (cmd === 'M' || cmd === 'm') {
+				indices.push({ index, x, y });
 			}
 		}
-		
-		if(lastM == 0){
-			return false; // only 1 M command, no need to split
+
+		if (indices[0].index !== 0){
+			indices.push({ index: 0, x: 0, y: 0 });
 		}
-		
-		const n = seglist.numberOfItems;
-		for(i=0; i<n; i++){
-			var s = seglist.getItem(i);
-			var command = s.pathSegTypeAsLetter;
-			if(command == 'M' || command == 'm'){
-				p = path.cloneNode();
-				p.setAttribute('d','');
-				paths.push(p);
+		const last = indices[indices.length - 1];
+		indices.push({ index: seglist.numberOfItems, x: last.x, y: last.y });
+
+		const split = indices.slice(1).map((to, i) => { 
+			const from = indices[i];
+			const p = path.cloneNode();
+			Object.setPrototypeOf(p, window.SVGPathElement.prototype);
+			p.setAttribute('d', '');
+			const pathSegList = p.pathSegList || (p.pathSegList = new window.SVGPathSegList(p));
+			const seg = window.SVGPathElement.prototype.createSVGPathSegMovetoAbs.call(this, from.x, from.y);
+			pathSegList.appendItem(seg)
+			for (let j = from.index + 1; j < to.index; j++) {
+				pathSegList.appendItem(seglist.getItem(j));
 			}
-			
-			if (/[MLHVCSQTA]/.test(command)){
-			  if ('x' in s) x=s.x;
-			  if ('y' in s) y=s.y;
-			  
-			  seglist.appendItem(s);
-			}
-			else{
-				if ('x'  in s) x+=s.x;
-				if ('y'  in s) y+=s.y;
-				if(command == 'm'){
-					seglist.appendItem(path.createSVGPathSegMovetoAbs(x,y));
-				}
-				else{
-					if(command == 'Z' || command == 'z'){
-						x = x0;
-						y = y0;
-					}
-					seglist.appendItem(s);
-				}
-			}
-			// Record the start of a subpath
-			if (command=='M' || command=='m'){
-				x0=x, y0=y;
-			}
-		}
-		
-		var addedPaths = [];
-		for(i=0; i<paths.length; i++){
-			// don't add trivial paths from sequential M commands
-			if((paths[i].pathSegList || new window.SVGPathSegList(paths[i])).numberOfItems > 1){
-				path.parentElement.insertBefore(paths[i], path);
-				addedPaths.push(paths[i]);
-			}
-		}
-		
+			return p;
+		}).filter(p => p.pathSegList.numberOfItems > 1);
+		split.forEach(p => {
+			path.parentElement.insertBefore(p, path);
+		});
 		path.remove();
 		
-		return addedPaths;
+		return split;
 	}
 	
 	// recursively run the given function on the given element

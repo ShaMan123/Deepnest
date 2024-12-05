@@ -1,10 +1,12 @@
 const path = require("path");
 const { ensureDir } = require("fs-extra");
-const { readFile, writeFile } = require("fs/promises");
+const { readFile, writeFile, readdir } = require("fs/promises");
 const { nest, nestingToSVG } = require("./index");
 
 async function main() {
-  const files = ["./input/letters.svg", "./input/letters2.svg"];
+  const files = (await readdir("./input"))
+    .filter((file) => path.extname(file) === ".svg")
+    .map((file) => path.resolve("./input", file));
   nest(
     await Promise.all(
       files.map(async (file) => ({

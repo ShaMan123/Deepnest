@@ -74,7 +74,6 @@
 					const points = new Array(values.length / 2)
 					  .fill(0)
 					  .map((_, i) => ({ x: values[i * 2], y: values[i * 2 + 1] }))
-					poly.setAttribute('points', points);
 					poly.points = points;
 				}
 			});

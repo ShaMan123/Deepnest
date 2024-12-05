@@ -4,8 +4,8 @@ const { GeometryUtil } = require('./util/geometryutil');
 const ClipperLib = require('./util/clipper');
 const d3 = require('./util/d3-polygon');
 const { calculateNFP } = require('bindings')('addon.node');
-const { processPairs } = require('./processPairs');
-
+const { Worker, parentPort } = require('node:worker_threads');
+const path = require('path');
 
 function clone(nfp){
 	var newnfp = [];
@@ -104,12 +104,45 @@ const db = {
 
 const nfpcache = {}
 
-/**
- * 
- * @param {EventTarget} eventEmitter 
- */
-function processNesting(eventEmitter) {  
-	eventEmitter.addEventListener('background-start', ({ detail: data }) => {
+function processPairs(pairs, { signal, threadCount = 1 } = {}) {
+	return new Promise((resolve, reject) => {
+		const result = [];
+		const threads = new Set();
+		console.log(`Processing pairs with ${threadCount} threads...`);
+		const pairsPerWorker = Math.ceil(pairs.length / threadCount);
+		for (let i = 0; i < threadCount; i++) {
+			const start = pairsPerWorker * i;
+			const worker = new Worker(path.resolve(__dirname, 'processPairs.js'), {
+				workerData: { pairs: pairs.slice(start, start + pairsPerWorker) },
+			});
+			worker.on("error", reject);
+			worker.on("exit", () => {
+				threads.delete(worker);
+				if (threads.size === 0) {
+					console.log('Pair processing completed');
+					result.length === pairs.length ? resolve(result) : reject(`Error while processing pairs, expected ${pairs.length} received ${result.length}`);
+				} else {
+					console.log(`Thread exiting, ${threads.size} running...`);
+				}
+			});
+			worker.on("message", (data) => {
+				result.push(...data);
+			});
+			threads.add(worker);
+		}
+		const terminate = () => {
+			const workers = Array.from(threads.values());
+			// console.log('Terminating pair process workers', workers.length);
+			threads.clear();
+			workers.forEach(worker => worker.terminate())
+		}
+		signal?.addEventListener('abort', terminate);
+		parentPort.on('close', terminate);
+	  })
+}
+
+function attach() {  
+	parentPort.on('message', (data) => {
 		var index = data.index;
 	    var individual = data.individual;
 
@@ -177,20 +210,18 @@ function processNesting(eventEmitter) {
 		  	//console.log('starting synchronous calculations', Object.keys(window.nfpCache).length);
 		  	// console.log('in sync');
 
-            // eventEmitter.dispatchEvent(new CustomEvent(('test', {detail: [data.sheets, parts, data.config, index]})));
-		  	var placement = placeParts(data.sheets, parts, data.config, index, eventEmitter);
+		  	var placement = placeParts(data.sheets, parts, data.config, index);
 	
 			placement.index = data.index;
-			eventEmitter.dispatchEvent(new CustomEvent('background-response', {detail:placement}));
+			parentPort.postMessage({ type: 'background-response', data: placement });
 		  }
 		  
 		//   console.time('Total');
 		  
 		  
 		  if(pairs.length > 0){
-			const abortController = new AbortController();
-			eventEmitter.addEventListener('stopped', () => abortController.abort())
-			  processPairs(pairs, { threadCount: 4, signal: abortController.signal }).then(function(processed){
+			return processPairs(pairs, { threadCount: 4 })
+				.then(function(processed){
 			  	 function getPart(source){
 					for(var k=0; k<parts.length; k++){
 						if(parts[k].source == source){
@@ -708,7 +739,7 @@ function getInnerNfp(A, B, config){
 	return f;
 }
 
-function placeParts(sheets, parts, config, nestindex, eventEmitter){
+function placeParts(sheets, parts, config, nestindex){
 
 	if(!sheets){
 		return null;
@@ -1046,7 +1077,7 @@ function placeParts(sheets, parts, config, nestindex, eventEmitter){
 				placednum += allplacements[j].sheetplacements.length;
 			}
 			//console.log(placednum, totalnum);
-			eventEmitter.dispatchEvent(new CustomEvent('background-progress', { detail: {index: nestindex, progress: 0.5 + 0.5*(placednum/totalnum)}}));
+			parentPort.postMessage({ type: 'background-progress', data: { index: nestindex, progress: 0.5 + 0.5*(placednum/totalnum) }});
 			// console.timeEnd('placement');
 		}
 		
@@ -1079,7 +1110,7 @@ function placeParts(sheets, parts, config, nestindex, eventEmitter){
 		fitness += 100000000*(Math.abs(GeometryUtil.polygonArea(parts[i]))/totalsheetarea);
 	}
 	// send finish progerss signal
-	eventEmitter.dispatchEvent(new CustomEvent('background-progress', { detail: {index: nestindex, progress: -1} }));
+	parentPort.postMessage({ type: 'background-progress', data: { index: nestindex, progress: -1 }});
 
 	// console.log('WATCH', allplacements);
 	
@@ -1091,4 +1122,5 @@ function alert(message) {
     console.log('alert: ', message);
 }
 
-module.exports = { processNesting }
+
+attach();

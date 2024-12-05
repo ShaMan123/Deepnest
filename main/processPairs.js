@@ -1,6 +1,4 @@
 const {
-  Worker,
-  isMainThread,
   parentPort,
   workerData,
 } = require("worker_threads");
@@ -84,44 +82,4 @@ function processPair(pair) {
   return pair;
 }
 
-function processPairs(pairs, { signal, threadCount = 4 } = {}) {
-  return new Promise((resolve, reject) => {
-    if (isMainThread) {
-      const result = [];
-      const threads = new Set();
-      // console.log(`Running with ${threadCount} threads...`);
-      const pairsPerWorker = Math.ceil(pairs.length / threadCount);
-      for (let i = 0; i < threadCount - 1; i++) {
-        const start = pairsPerWorker * i;
-        threads.add(
-          new Worker(__filename, {
-            workerData: { pairs: pairs.slice(start, start + pairsPerWorker) },
-          })
-        );
-      }
-      for (let worker of threads) {
-        worker.on("error", reject);
-        worker.on("exit", () => {
-          threads.delete(worker);
-          // console.log(`Thread exiting, ${threads.size} running...`);
-          if (threads.size === 0) {
-            resolve(result);
-          }
-        });
-        worker.on("message", (data) => {
-          result.push(...data);
-        });
-      }
-      signal.addEventListener('abort', () => {
-        const workers = Array.from(threads.values());
-        // console.log('Terminating pair process workers', workers.length);
-        threads.clear();
-        return Promise.all(workers.map(worker => worker.terminate()));
-      })
-    } else {
-      parentPort.postMessage(workerData.pairs.map(processPair));
-    }
-  });
-}
-
-module.exports = { processPairs };
+parentPort.postMessage(workerData.pairs.map(processPair));

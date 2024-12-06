@@ -120,6 +120,7 @@ async function nest(
     spacing = 4,
     sheet = { width: 3000, height: 1000 },
     timeout = 0,
+    progressCallback,
     ...config
   } = {}
 ) {
@@ -176,15 +177,9 @@ async function nest(
     throw new Error("Nothing to nest");
   }
 
-  eventEmitter.addEventListener(
-    "background-progress",
-    ({ detail: { message = "", index, progress } }) => {
-      progress >= 0 &&
-        console.info(
-          `iteration(${index}): ${Math.round(progress * 100)}% ${message}`
-        );
-    }
-  );
+  eventEmitter.addEventListener("background-progress", ({ detail }) => {
+    detail.progress >= 0 && progressCallback(detail);
+  });
 
   let t = 0;
   const abort = async () => {

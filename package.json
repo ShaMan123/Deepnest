@@ -7,6 +7,7 @@
   "gypfile": true,
   "scripts": {
     "start": "electron .",
+    "serve": "nodemon server.mjs",
     "test": "playwright test",
     "exec": "electron --enable-logging main.test.js",
     "configure": "node-gyp configure --release",
@@ -33,18 +34,22 @@
     "@electron/packager": "^18.3.6",
     "@electron/rebuild": "^3.2.9",
     "@playwright/test": "^1.49.0",
+    "@types/express": "^5.0.0",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.10.1",
     "electron": "^19.1.9",
     "nan": "^2.22.0",
+    "nodemon": "^3.1.7",
     "shx": "^0.3.4"
   },
   "dependencies": {
     "@electron/remote": "^2.1.2",
     "bindings": "^1.5.0",
+    "express": "^4.21.2",
     "fs-extra": "^11.2.0",
     "graceful-fs": "^4.2.11",
     "jsdom": "^25.0.1",
+    "ora": "^8.1.1",
     "pathseg": "^1.2.1",
     "request": "^2.88.2"
   },

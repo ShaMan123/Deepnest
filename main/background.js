@@ -105,11 +105,11 @@ const db = {
 
 const nfpcache = {}
 
-function processPairs(pairs, { index, signal, threadCount = os.cpus().length } = {}) {
+function processPairs(pairs, { index, signal, threadCount = os.cpus().length - 1 } = {}) {
 	return new Promise((resolve, reject) => {
+		parentPort.postMessage({ type: 'background-progress', data: { phase: 'no-fit-polygon', index, progress: 0, threads: threadCount } });
 		const result = [];
 		const threads = new Set();
-		console.log(`Processing pairs with ${threadCount} threads...`);
 		const pairsPerWorker = Math.ceil(pairs.length / threadCount);
 		for (let i = 0; i < threadCount; i++) {
 			const start = pairsPerWorker * i;
@@ -120,21 +120,17 @@ function processPairs(pairs, { index, signal, threadCount = os.cpus().length } =
 			worker.on("exit", () => {
 				threads.delete(worker);
 				if (threads.size === 0) {
-					console.log('Pair processing completed');
 					result.length === pairs.length ? resolve(result) : reject(`Error while processing pairs, expected ${pairs.length} received ${result.length}`);
-				} else {
-					// console.log(`Thread exiting, ${threads.size} running...`);
-				}
+				} 
 			});
 			worker.on("message", (data) => {
 				result.push(...data);
-				parentPort.postMessage({ type: 'background-progress', data: { message: 'ready', index, progress: result.length / pairs.length } })
+				parentPort.postMessage({ type: 'background-progress', data: { phase: 'no-fit-polygon', index, progress: result.length / pairs.length, threads: threads.size } });
 			});
 			threads.add(worker);
 		}
 		const terminate = () => {
 			const workers = Array.from(threads.values());
-			// console.log('Terminating pair process workers', workers.length);
 			threads.clear();
 			workers.forEach(worker => worker.terminate())
 		}
@@ -776,6 +772,8 @@ function placeParts(sheets, parts, config, nestindex){
 	var key, nfp;
 	var part;
 	var _sheets = sheets.slice()
+
+	parentPort.postMessage({ type: 'background-progress', data: { phase: 'placement', index: nestindex, progress: 0, threads: 1 }});
 	
 	while(parts.length > 0){
 		
@@ -1079,7 +1077,7 @@ function placeParts(sheets, parts, config, nestindex){
 				placednum += allplacements[j].sheetplacements.length;
 			}
 			//console.log(placednum, totalnum);
-			parentPort.postMessage({ type: 'background-progress', data: { index: nestindex, progress: 0.5 + 0.5*(placednum/totalnum) }});
+			parentPort.postMessage({ type: 'background-progress', data: { phase: 'placement', index: nestindex, progress: 0.5 + 0.5*(placednum/totalnum), threads: 1 }});
 			// console.timeEnd('placement');
 		}
 		
@@ -1112,7 +1110,7 @@ function placeParts(sheets, parts, config, nestindex){
 		fitness += 100000000*(Math.abs(GeometryUtil.polygonArea(parts[i]))/totalsheetarea);
 	}
 	// send finish progerss signal
-	parentPort.postMessage({ type: 'background-progress', data: { index: nestindex, progress: -1 }});
+	parentPort.postMessage({ type: 'background-progress', data: { phase: 'placement', index: nestindex, progress: 1, threads: 1 }});
 
 	// console.log('WATCH', allplacements);
 	

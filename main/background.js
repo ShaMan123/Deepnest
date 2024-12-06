@@ -135,7 +135,7 @@ function processPairs(pairs, { index, signal, threadCount = os.cpus().length - 1
 			workers.forEach(worker => worker.terminate())
 		}
 		signal?.addEventListener('abort', terminate);
-		parentPort.on('close', terminate);
+		parentPort.once('close', terminate);
 	  })
 }
 

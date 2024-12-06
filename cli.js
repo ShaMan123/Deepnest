@@ -9,6 +9,7 @@ async function main() {
     .map((file) => path.resolve("./input", file));
   const spinner = (await import("ora")).default();
   spinner.start("Nesting");
+  let i = 0;
   nest(
     await Promise.all(
       files.map(async (file) => ({
@@ -16,7 +17,7 @@ async function main() {
         svg: (await readFile(file)).toString(),
       }))
     ),
-    async ({ iteration: i, result, svg, elements, abort }) => {
+    async ({ status, result, svg, abort }) => {
       await abort();
       const outputDir = path.resolve("./output");
       await ensureDir(outputDir);
@@ -24,10 +25,11 @@ async function main() {
         svg: path.resolve(outputDir, `result-${i}.svg`),
         json: path.resolve(outputDir, `data-${i}.json`),
       };
+      i++;
       await writeFile(out.svg, svg());
       await writeFile(out.json, JSON.stringify(result, null, 2));
       spinner.succeed(
-        `Successfully nested ${elements.length} elements\n- svg: ${out.svg}\n- json: ${out.json}`
+        `Successfully nested ${status.placed}/${status.total} elements\n- svg: ${out.svg}\n- json: ${out.json}`
       );
     },
     {

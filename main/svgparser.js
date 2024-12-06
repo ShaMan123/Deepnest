@@ -45,10 +45,24 @@
 		const values = poly.getAttribute('points')
 			.split(polyPointsSplitRE)
 			.map((q) => Number(q));
-		const points = new Array(values.length / 2)
+		let points = new Array(values.length / 2)
 			.fill(0)
 			.map((_, i) => ({ x: values[i * 2], y: values[i * 2 + 1] }));
-		return points
+		const pointsList = {
+			get length() {
+				return points.length;
+			},
+			appendItem(point) {
+				return points.push(point);
+			},
+			clear() {
+				points = []
+			},
+			toString() {
+				return points.map(point => `${point.x},${point.y}`).join(' ');
+			}
+		}
+		return pointsList;
 	}
 	
 	SvgParser.prototype.load = function(dirpath, svgString, scale, scalingFactor){
@@ -1210,10 +1224,10 @@
 					var polygon = this.svg.createElementNS('http://www.w3.org/2000/svg', 'polygon');
 					
 															
-					var p1 = this.svgRoot.createSVGPoint();
-					var p2 = this.svgRoot.createSVGPoint();
-					var p3 = this.svgRoot.createSVGPoint();
-					var p4 = this.svgRoot.createSVGPoint();
+					var p1 = { x: 0, y: 0 };
+					var p2 = { x: 0, y: 0 };
+					var p3 = { x: 0, y: 0 };
+					var p4 = { x: 0, y: 0 };
 					
 					p1.x = parseFloat(element.getAttribute('x')) || 0;
 					p1.y = parseFloat(element.getAttribute('y')) || 0;

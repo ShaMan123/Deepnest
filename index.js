@@ -7,13 +7,23 @@ Object.assign(global, { DOMParser, XMLSerializer, window, document });
 const { DeepNest } = require("./main/deepnest");
 const SvgParser = require("./main/svgparser");
 const { Worker } = require("worker_threads");
-const { readFile, writeFile } = require("fs/promises");
 const path = require("path");
 
 const eventEmitter = new EventTarget();
 
-function nestingToSVG(deepNest, placementResult, dxf = false) {
+function nestingToSVG(
+  deepNest,
+  placementResult,
+  title = "Nesting result",
+  dxf = false
+) {
   var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const titleEl = document.createElementNS(
+    "http://www.w3.org/2000/svg",
+    "title"
+  );
+  titleEl.innerHTML = title;
+  svg.appendChild(titleEl);
 
   var svgwidth = 0;
   var svgheight = 0;
@@ -191,18 +201,22 @@ async function nest(
   process.on("SIGINT", abort);
 
   eventEmitter.addEventListener("placement", ({ detail: { data, better } }) => {
+    const result = data.placements.flatMap(({ sheetplacements }) =>
+      sheetplacements.slice().sort((a, b) => a.id - b.id)
+    );
     return callback({
       iteration: data.index,
-      result: data.placements.flatMap(({ sheetplacements }) =>
-        sheetplacements.slice().sort((a, b) => a.id - b.id)
-      ),
+      result,
       data,
       elements,
-      better,
-      complete:
-        data.placements.flatMap((p) => p.sheetplacements).length ===
-        elements.length,
-      svg: () => nestingToSVG(deepNest, data),
+      status: {
+        better,
+        complete: result.length === elements.length,
+        placed: result.length,
+        total: elements.length,
+      },
+      svg: () =>
+        nestingToSVG(deepNest, data, `${result.length}/${elements.length}`),
       abort,
     });
   });

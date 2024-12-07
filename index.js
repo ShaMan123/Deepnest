@@ -50,7 +50,8 @@ function nestingToSVG(
         "g"
       );
 
-      part.svgelements.forEach(function (e, index) {
+      !part && console.error("TODO: unknown bug", part, p);
+      part?.svgelements.forEach(function (e, index) {
         var node = e.cloneNode(false);
         if (
           (node.tagName === "polyline" || node.tagName === "polygon") &&
@@ -205,7 +206,6 @@ async function nest(
       sheetplacements.slice().sort((a, b) => a.id - b.id)
     );
     return callback({
-      iteration: data.index,
       result,
       data,
       elements,

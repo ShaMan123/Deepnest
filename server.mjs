@@ -84,8 +84,14 @@ function subscribeToSeverEvents(endPoint, data) {
   const progressbar = document.getElementById("nesting-progress");
   const progressLabel = document.querySelector("label[for='nesting-progress']");
   const stopButton = document.getElementById("stop");
+  const stats = document.getElementById("stats");
+  const container = document.getElementById("container");
+  const json = document.getElementById("json");
   stopButton.addEventListener("click", () => evtSource.close());
   evtSource.addEventListener("open", () => {
+    stats.innerHTML = "";
+    container.innerHTML = "";
+    json.innerHTML = "";
     progressbar.setAttribute("value", 50);
     progressLabel.innerHTML = "Connecting";
   });
@@ -102,12 +108,14 @@ function subscribeToSeverEvents(endPoint, data) {
     if (!status.better) {
       return;
     }
-    document.getElementById("container").innerHTML = svg;
-    document.getElementById("json").innerHTML = JSON.stringify(data, null, 2);
+    stats.innerHTML = `${status.placed}/${status.total}`;
+    container.innerHTML = svg;
+    json.innerHTML = JSON.stringify(data, null, 2);
   });
   evtSource.addEventListener("error", () => {
     progressLabel.innerHTML = "ERROR";
   });
+  return () => evtSource.close();
 }
 
 async function getFont({
@@ -145,9 +153,19 @@ async function getFont({
   return parse(await response.arrayBuffer());
 }
 
-app.get("/", async (req, res) => {
+app.get("/", (req, res) => {
+  res.contentType("text/html");
+  res.send(`
+    <h1>Nesting App</h1>
+    <div><a href="/text">Nest Text</a></div>
+    <div><a href="/upload">Nest SVG Files</a> (supports only polys and paths)</div>
+    `);
+});
+
+app.get("/upload", async (req, res) => {
   function subscribeToFileInput() {
     const config = { units: "mm", spacing: 4 };
+    let disposer;
     document.getElementById("upload").addEventListener("change", async (e) => {
       const formData = new FormData();
       formData.append("config", JSON.stringify(config));
@@ -155,7 +173,10 @@ app.get("/", async (req, res) => {
       for (let i = 0; i < files.length; i++) {
         formData.append(files[i].name, files[i]);
       }
-      files.length && subscribeToSeverEvents("/nest", formData);
+      disposer?.();
+      disposer = files.length
+        ? subscribeToSeverEvents("/nest", formData)
+        : undefined;
     });
   }
 
@@ -171,8 +192,9 @@ app.get("/", async (req, res) => {
     </script>
     <input id="upload" type="file" accept="image/svg+xml" multiple />
     <button id="stop">stop</button>
-    <label for="nesting-progress">idle</label>
+    <label for="nesting-progress"></label>
     <progress id="nesting-progress" value="0" max="100"></progress>
+    <div id="stats"></div>
     <div id="container"></div>
     <pre id="json"></pre>
     `);
@@ -203,11 +225,13 @@ app.get("/text", async (req, res) => {
 
   function subscribeToFormSubmission() {
     const config = { units: "mm", spacing: 4 };
+    let disposer;
     document.getElementById("form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const formData = new FormData(e.target);
       formData.append("config", JSON.stringify(config));
-      subscribeToSeverEvents("/nest/text", formData);
+      disposer?.();
+      disposer = subscribeToSeverEvents("/nest/text", formData);
     });
   }
   res.contentType("text/html");
@@ -221,19 +245,20 @@ app.get("/text", async (req, res) => {
     subscribeToFormSubmission();
     </script>
     <div>
-      <form id="form">
+      <form id="form" style="display: inline">
         <input name="text" type="text" value="abcdefghijlmnopqrstuvwxyz" placeholder="Text to nest" />
         <select name="font">${fonts.map(
           (font) => `<option value="${font.id}">${font.family}</option>`
         )}</select>
         <input type="submit" />
       </form>
+      <button id="stop">stop</button>
     </div>
     <div>
-    <label for="nesting-progress">idle</label>
+    <label for="nesting-progress"></label>
     <progress id="nesting-progress" value="0" max="100"></progress>
     </div>
-    <div><button id="stop">stop</button></div>
+    <div id="stats"></div>
     <div id="container"></div>
     <pre id="json"></pre>
     `);

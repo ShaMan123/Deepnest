@@ -24,6 +24,17 @@ function nestingToSVG(
   );
   titleEl.innerHTML = title;
   svg.appendChild(titleEl);
+  const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+  style.innerHTML = `
+  path {
+    fill: antiquewhite;
+    stroke: black;
+  }
+  path:nth-child(1) {
+    fill: black;
+  }
+  `;
+  svg.appendChild(style);
 
   var svgwidth = 0;
   var svgheight = 0;
@@ -109,14 +120,6 @@ function nestingToSVG(
     SvgParser.splitLines(svg);
     SvgParser.mergeOverlap(svg, 0.1 * curveTolerance);
     SvgParser.mergeLines(svg);
-
-    // set stroke and fill for all
-    Array.from(svg.children).forEach(function (e) {
-      if (e.tagName != "g" && e.tagName != "image") {
-        e.setAttribute("fill", "none");
-        e.setAttribute("stroke", "#000000");
-      }
-    });
   }
 
   return new XMLSerializer().serializeToString(svg);

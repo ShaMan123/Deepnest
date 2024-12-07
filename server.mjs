@@ -145,8 +145,7 @@ app.post(
   }
 );
 
-const server = app.listen(PORT, (err) => {
-  if (err) console.log(err);
+const server = app.listen(PORT, () => {
   console.log("Server listening on PORT", PORT);
 });
 

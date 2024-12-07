@@ -36,7 +36,7 @@ async function main() {
       timeout: 60_000,
       spacing: 4,
       progressCallback: ({ index, progress, phase, threads }) => {
-        spinner.text = `iteration[${index}]: ${phase} ${Math.round(
+        spinner.text = `${phase} ${Math.round(
           progress * 100
         )}% with ${threads} threads`;
       },

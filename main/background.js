@@ -1,5 +1,12 @@
 'use strict';
 
+const { GeometryUtil } = require('./util/geometryutil');
+const ClipperLib = require('./util/clipper');
+const d3 = require('./util/d3-polygon');
+const { calculateNFP } = require('bindings')('addon.node');
+const { Worker, parentPort } = require('node:worker_threads');
+const path = require('path');
+const os = require('os');
 
 function clone(nfp){
 	var newnfp = [];
@@ -42,10 +49,10 @@ function cloneNfp(nfp, inner){
 	return newnfp;
 }
 
-window.db = {
+const db = {
 	has: function(obj){
 		var key = 'A'+obj.A+'B'+obj.B+'Arot'+parseInt(obj.Arotation)+'Brot'+parseInt(obj.Brotation);
-		if(window.nfpcache[key]){
+		if(nfpcache[key]){
 			return true;
 		}
 		return false;
@@ -54,8 +61,8 @@ window.db = {
 	find : function(obj, inner){
 		var key = 'A'+obj.A+'B'+obj.B+'Arot'+parseInt(obj.Arotation)+'Brot'+parseInt(obj.Brotation);
 		//console.log('key: ', key);
-		if(window.nfpcache[key]){
-			return cloneNfp(window.nfpcache[key], inner);
+		if(nfpcache[key]){
+			return cloneNfp(nfpcache[key], inner);
 		}
 		/*var keypath = './nfpcache/'+key+'.json';
 		if(fs.existsSync(keypath)){
@@ -70,7 +77,7 @@ window.db = {
 			var nfp = obj.nfp;
 			nfp.children = obj.children;
 			
-			window.nfpcache[key] = clone(nfp);
+			nfpcache[key] = clone(nfp);
 			
 			return nfp;
 		}*/
@@ -79,11 +86,11 @@ window.db = {
 	
 	insert : function(obj, inner){
 		var key = 'A'+obj.A+'B'+obj.B+'Arot'+parseInt(obj.Arotation)+'Brot'+parseInt(obj.Brotation);
-		if(window.performance.memory.totalJSHeapSize < 0.8*window.performance.memory.jsHeapSizeLimit){
-			window.nfpcache[key] = cloneNfp(obj.nfp, inner);
+		// if(window.performance.memory.totalJSHeapSize < 0.8*window.performance.memory.jsHeapSizeLimit){
+			nfpcache[key] = cloneNfp(obj.nfp, inner);
 			//console.log('cached: ',window.cache[key].poly);
 			//console.log('using', window.performance.memory.totalJSHeapSize/window.performance.memory.jsHeapSizeLimit);
-		}
+		// }
 		
 		/*obj.children = obj.nfp.children;
 		
@@ -96,22 +103,44 @@ window.db = {
 	}
 }
 
-window.onload = function () {
-	const { ipcRenderer } = require('electron');
-	window.ipcRenderer = ipcRenderer;
-	window.addon = require('../minkowski/Release/addon');
-	
-	window.path = require('path')
-	window.url = require('url')
-	window.fs = require('graceful-fs');
-/*
-add package 'filequeue 0.5.0' if you enable this
-	window.FileQueue = require('filequeue');
-	window.fq = new FileQueue(500);
-*/	
-	window.nfpcache = {};
-	  
-	ipcRenderer.on('background-start', (event, data) => {
+const nfpcache = {}
+
+function processPairs(pairs, { index, signal, threadCount = os.cpus().length - 1 } = {}) {
+	return new Promise((resolve, reject) => {
+		parentPort.postMessage({ type: 'background-progress', data: { phase: 'no-fit-polygon', index, progress: 0, threads: threadCount } });
+		const result = [];
+		const threads = new Set();
+		const pairsPerWorker = Math.ceil(pairs.length / threadCount);
+		for (let i = 0; i < threadCount; i++) {
+			const start = pairsPerWorker * i;
+			const worker = new Worker(path.resolve(__dirname, 'processPairs.js'), {
+				workerData: { pairs: pairs.slice(start, start + pairsPerWorker) },
+			});
+			worker.on("error", reject);
+			worker.on("exit", () => {
+				threads.delete(worker);
+				if (threads.size === 0) {
+					result.length === pairs.length ? resolve(result) : reject(`Error while processing pairs, expected ${pairs.length} received ${result.length}`);
+				} 
+			});
+			worker.on("message", (data) => {
+				result.push(...data);
+				parentPort.postMessage({ type: 'background-progress', data: { phase: 'no-fit-polygon', index, progress: result.length / pairs.length, threads: threads.size } });
+			});
+			threads.add(worker);
+		}
+		const terminate = () => {
+			const workers = Array.from(threads.values());
+			threads.clear();
+			workers.forEach(worker => worker.terminate())
+		}
+		signal?.addEventListener('abort', terminate);
+		parentPort.once('close', terminate);
+	  })
+}
+
+function attach() {  
+	parentPort.on('message', (data) => {
 		var index = data.index;
 	    var individual = data.individual;
 
@@ -172,124 +201,25 @@ add package 'filequeue 0.5.0' if you enable this
 			}
 		}
 		
-		console.log('pairs: ',pairs.length);
-		  
-		  var process = function(pair){
-			
-			var A = rotatePolygon(pair.A, pair.Arotation);
-			var B = rotatePolygon(pair.B, pair.Brotation);
-			
-			var clipper = new ClipperLib.Clipper();
-			
-			var Ac = toClipperCoordinates(A);
-			ClipperLib.JS.ScaleUpPath(Ac, 10000000);
-			var Bc = toClipperCoordinates(B);
-			ClipperLib.JS.ScaleUpPath(Bc, 10000000);
-			for(var i=0; i<Bc.length; i++){
-				Bc[i].X *= -1;
-				Bc[i].Y *= -1;
-			}
-			var solution = ClipperLib.Clipper.MinkowskiSum(Ac, Bc, true);
-			var clipperNfp;
-		
-			var largestArea = null;
-			for(i=0; i<solution.length; i++){
-				var n = toNestCoordinates(solution[i], 10000000);
-				var sarea = -GeometryUtil.polygonArea(n);
-				if(largestArea === null || largestArea < sarea){
-					clipperNfp = n;
-					largestArea = sarea;
-				}
-			}
-			
-			for(var i=0; i<clipperNfp.length; i++){
-				clipperNfp[i].x += B[0].x;
-				clipperNfp[i].y += B[0].y;
-			}
-			
-			pair.A = null;
-			pair.B = null;
-			pair.nfp = clipperNfp;
-			return pair;
-			
-			function toClipperCoordinates(polygon){
-				var clone = [];
-				for(var i=0; i<polygon.length; i++){
-					clone.push({
-						X: polygon[i].x,
-						Y: polygon[i].y
-					});
-				}
-	
-				return clone;
-			};
-			
-			function toNestCoordinates(polygon, scale){
-				var clone = [];
-				for(var i=0; i<polygon.length; i++){
-					clone.push({
-						x: polygon[i].X/scale,
-						y: polygon[i].Y/scale
-					});
-				}
-	
-				return clone;
-			};
-			
-			function rotatePolygon(polygon, degrees){
-				var rotated = [];
-				var angle = degrees * Math.PI / 180;
-				for(var i=0; i<polygon.length; i++){
-					var x = polygon[i].x;
-					var y = polygon[i].y;
-					var x1 = x*Math.cos(angle)-y*Math.sin(angle);
-					var y1 = x*Math.sin(angle)+y*Math.cos(angle);
-						
-					rotated.push({x:x1, y:y1});
-				}
-	
-				return rotated;
-			};
-		  }
+		// console.log('pairs: ',pairs.length);
 		  
 		  // run the placement synchronously
 		  function sync(){
 		  	//console.log('starting synchronous calculations', Object.keys(window.nfpCache).length);
-		  	console.log('in sync');
-		  	var c=0;
-		  	for (var key in window.nfpcache) {
-				c++;
-			}
-			console.log('nfp cached:', c);
-			console.log()
-            ipcRenderer.send('test', [data.sheets, parts, data.config, index]);
+		  	// console.log('in sync');
+
 		  	var placement = placeParts(data.sheets, parts, data.config, index);
 	
 			placement.index = data.index;
-			ipcRenderer.send('background-response', placement);
+			parentPort.postMessage({ type: 'background-response', data: placement });
 		  }
 		  
-		  console.time('Total');
+		//   console.time('Total');
 		  
 		  
 		  if(pairs.length > 0){
-			  var p = new Parallel(pairs, {
-				evalPath: 'util/eval.js',
-				synchronous: false
-			  });
-			  
-			  var spawncount = 0;
-				
-				p._spawnMapWorker = function (i, cb, done, env, wrk){
-					// hijack the worker call to check progress
-					ipcRenderer.send('background-progress', {index: index, progress: 0.5*(spawncount++/pairs.length)});
-					return Parallel.prototype._spawnMapWorker.call(p, i, cb, done, env, wrk);
-				}
-			  
-			  p.require('clipper.js');
-			  p.require('geometryutil.js');
-		  
-			  p.map(process).then(function(processed){
+			return processPairs(pairs, { index })
+				.then(function(processed){
 			  	 function getPart(source){
 					for(var k=0; k<parts.length; k++){
 						if(parts[k].source == source){
@@ -339,11 +269,11 @@ add package 'filequeue 0.5.0' if you enable this
 						Brotation: processed[i].Brotation,
 						nfp: processed[i].nfp
 					};
-					window.db.insert(doc);
+					db.insert(doc);
 					
 				}
-				console.timeEnd('Total');
-				console.log('before sync');
+				// console.timeEnd('Total');
+				// console.log('before sync');
 				sync();
 			  });
 		  }
@@ -639,7 +569,7 @@ function getOuterNfp(A, B, inside){
 	}*/
 	
 	// try the file cache if the calculation will take a long time
-	var doc = window.db.find({ A: A.source, B: B.source, Arotation: A.rotation, Brotation: B.rotation });
+	var doc = db.find({ A: A.source, B: B.source, Arotation: A.rotation, Brotation: B.rotation });
 	
 	if(doc){
 		return doc;
@@ -649,12 +579,12 @@ function getOuterNfp(A, B, inside){
 	if(inside || (A.children && A.children.length > 0)){
 	//console.log('computing minkowski: ',A.length, B.length);
 	//console.time('addon');
-	nfp = addon.calculateNFP({A: A, B: B});
+	nfp = calculateNFP({ A, B });
 	//console.timeEnd('addon');
 	}
 	else{
-		console.log('minkowski', A.length, B.length, A.source, B.source);
-		console.time('clipper');
+		// console.log('minkowski', A.length, B.length, A.source, B.source);
+		// console.time('clipper');
 	
 		var Ac = toClipperCoordinates(A);
 		ClipperLib.JS.ScaleUpPath(Ac, 10000000);
@@ -686,7 +616,7 @@ function getOuterNfp(A, B, inside){
 		
 		nfp = [clipperNfp];
 		//console.log('clipper nfp', JSON.stringify(nfp));
-		console.timeEnd('clipper');
+		// console.timeEnd('clipper');
 	}
 	
 	if(!nfp || nfp.length == 0){
@@ -709,7 +639,7 @@ function getOuterNfp(A, B, inside){
 			Brotation: B.rotation,
 			nfp: nfp
 		};
-		window.db.insert(doc);
+		db.insert(doc);
 	}
 	
 	return nfp;
@@ -739,7 +669,7 @@ function getFrame(A){
 
 function getInnerNfp(A, B, config){
 	if(typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
-		var doc = window.db.find({ A: A.source, B: B.source, Arotation: 0, Brotation: B.rotation }, true);
+		var doc = db.find({ A: A.source, B: B.source, Arotation: 0, Brotation: B.rotation }, true);
 	
 		if(doc){
 			//console.log('fetch inner', A.source, B.source, doc);
@@ -793,7 +723,7 @@ function getInnerNfp(A, B, config){
 	
 	if(typeof A.source !== 'undefined' && typeof B.source !== 'undefined'){
 		// insert into db
-		console.log('inserting inner: ',A.source, B.source, B.rotation, f);
+		// console.log('inserting inner: ',A.source, B.source, B.rotation, f);
 		var doc = {
 			A: A.source,
 			B: B.source,
@@ -801,7 +731,7 @@ function getInnerNfp(A, B, config){
 			Brotation: B.rotation,
 			nfp: f
 		};
-		window.db.insert(doc, true);
+		db.insert(doc, true);
 	}
 	
 	return f;
@@ -841,6 +771,9 @@ function placeParts(sheets, parts, config, nestindex){
 	
 	var key, nfp;
 	var part;
+	var _sheets = sheets.slice()
+
+	parentPort.postMessage({ type: 'background-progress', data: { phase: 'placement', index: nestindex, progress: 0, threads: 1 }});
 	
 	while(parts.length > 0){
 		
@@ -848,7 +781,7 @@ function placeParts(sheets, parts, config, nestindex){
 		var placements = [];
 		
 		// open a new sheet
-		var sheet = sheets.shift();
+		var sheet = _sheets.shift();
 		var sheetarea = Math.abs(GeometryUtil.polygonArea(sheet));
 		totalsheetarea += sheetarea;
 		
@@ -857,7 +790,7 @@ function placeParts(sheets, parts, config, nestindex){
 		var clipCache = [];
 		//console.log('new sheet');
 		for(i=0; i<parts.length; i++){
-			console.time('placement');
+			// console.time('placement');
 			part = parts[i];
 			
 			// inner NFP
@@ -908,9 +841,9 @@ function placeParts(sheets, parts, config, nestindex){
 						}
 					}
 				}
-				if(position === null){
-					console.log(sheetNfp);
-				}
+				// if(position === null){
+				// 	console.log(sheetNfp);
+				// }
 				placements.push(position);
 				placed.push(part);
 				
@@ -962,7 +895,7 @@ function placeParts(sheets, parts, config, nestindex){
 			}
 			
 			if(error || !clipper.Execute(ClipperLib.ClipType.ctUnion, combinedNfp, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero)){
-				console.log('clipper error', error);
+				console.error('clipper error', error);
 				continue;
 			}
 			
@@ -976,7 +909,7 @@ function placeParts(sheets, parts, config, nestindex){
 				index: placed.length-1
 			};
 			
-			console.log('save cache', placed.length-1);
+			// console.log('save cache', placed.length-1);
 			
 			// difference with sheet polygon
 			var finalNfp = new ClipperLib.Paths();
@@ -1144,8 +1077,8 @@ function placeParts(sheets, parts, config, nestindex){
 				placednum += allplacements[j].sheetplacements.length;
 			}
 			//console.log(placednum, totalnum);
-			ipcRenderer.send('background-progress', {index: nestindex, progress: 0.5 + 0.5*(placednum/totalnum)});
-			console.timeEnd('placement');
+			parentPort.postMessage({ type: 'background-progress', data: { phase: 'placement', index: nestindex, progress: 0.5 + 0.5*(placednum/totalnum), threads: 1 }});
+			// console.timeEnd('placement');
 		}
 		
 		//if(minwidth){
@@ -1177,9 +1110,9 @@ function placeParts(sheets, parts, config, nestindex){
 		fitness += 100000000*(Math.abs(GeometryUtil.polygonArea(parts[i]))/totalsheetarea);
 	}
 	// send finish progerss signal
-	ipcRenderer.send('background-progress', {index: nestindex, progress: -1});
+	parentPort.postMessage({ type: 'background-progress', data: { phase: 'placement', index: nestindex, progress: 1, threads: 1 }});
 
-	console.log('WATCH', allplacements);
+	// console.log('WATCH', allplacements);
 	
 	return {placements: allplacements, fitness: fitness, area: sheetarea, mergedLength: totalMerged };
 }
@@ -1188,3 +1121,6 @@ function placeParts(sheets, parts, config, nestindex){
 function alert(message) { 
     console.log('alert: ', message);
 }
+
+
+attach();

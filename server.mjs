@@ -145,7 +145,9 @@ app.post(
   }
 );
 
-app.listen(PORT, (err) => {
+const server = app.listen(PORT, (err) => {
   if (err) console.log(err);
   console.log("Server listening on PORT", PORT);
 });
+
+process.once("SIGINT", () => server.close());

@@ -1,9 +1,7 @@
-const {
-  parentPort,
-  workerData,
-} = require("worker_threads");
-const ClipperLib = require("./util/clipper");
-const { GeometryUtil } = require("./util/geometryutil");
+import ClipperLib from "./util/clipper.js";
+import geometry from "./util/geometryutil.js";
+
+const { GeometryUtil } = geometry;
 
 function toClipperCoordinates(polygon) {
   var clone = [];
@@ -44,7 +42,7 @@ function rotatePolygon(polygon, degrees) {
   return rotated;
 }
 
-function processPair(pair) {
+export function processPair(pair) {
   var A = rotatePolygon(pair.A, pair.Arotation);
   var B = rotatePolygon(pair.B, pair.Brotation);
 
@@ -81,5 +79,3 @@ function processPair(pair) {
   pair.nfp = clipperNfp;
   return pair;
 }
-
-parentPort.postMessage(workerData.pairs.map(processPair));

@@ -103,17 +103,23 @@ const db = {
 	}
 }
 
-const nfpcache = {}
+const nfpcache = {};
 
-function processPairs(pairs, { index, signal, threadCount = os.cpus().length - 1 } = {}) {
+/**
+ * 2 threads are busy:
+ * The main thread and the thread that executes this file
+ */
+const availableThreads = Math.max(1, os.cpus().length - 2);
+
+function processPairs(pairs, { index, signal, threadCount = availableThreads } = {}) {
 	return new Promise((resolve, reject) => {
-		parentPort.postMessage({ type: 'background-progress', data: { phase: 'no-fit-polygon', index, progress: 0, threads: threadCount } });
+		parentPort.postMessage({ type: 'background-progress', data: { phase: 'NFP', index, progress: 0, threads: threadCount } });
 		const result = [];
 		const threads = new Set();
 		const pairsPerWorker = Math.ceil(pairs.length / threadCount);
 		for (let i = 0; i < threadCount; i++) {
 			const start = pairsPerWorker * i;
-			const worker = new Worker(path.resolve(__dirname, 'processPairs.js'), {
+			const worker = new Worker(path.resolve(__dirname, 'processPairs.node.mjs'), {
 				workerData: { pairs: pairs.slice(start, start + pairsPerWorker) },
 			});
 			worker.on("error", reject);
@@ -125,7 +131,7 @@ function processPairs(pairs, { index, signal, threadCount = os.cpus().length - 1
 			});
 			worker.on("message", (data) => {
 				result.push(...data);
-				parentPort.postMessage({ type: 'background-progress', data: { phase: 'no-fit-polygon', index, progress: result.length / pairs.length, threads: threads.size } });
+				parentPort.postMessage({ type: 'background-progress', data: { phase: 'NFP', index, progress: result.length / pairs.length, threads: threads.size } });
 			});
 			threads.add(worker);
 		}

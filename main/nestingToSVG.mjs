@@ -54,14 +54,7 @@ export function nestingToSVG(
       !part && console.error("TODO: unknown bug", part, p);
       part?.svgelements.forEach(function (e, index) {
         var node = e.cloneNode(false);
-        if (
-          (node.tagName === "polyline" || node.tagName === "polygon") &&
-          !node.points
-        ) {
-          node.points = SvgParser.parsePolyPoints(node);
-        } else if (node.tagName === "path") {
-          Object.setPrototypeOf(node, window.SVGPathElement.prototype);
-        }
+        SvgParser.polyfillSVGElement(node);
 
         if (placementResult.tagName == "image") {
           var relpath = placementResult.getAttribute("data-href");

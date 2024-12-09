@@ -41,30 +41,53 @@
 	}
 
 	const polyPointsSplitRE = /\s+|,/
-	SvgParser.prototype.parsePolyPoints = (poly) => {
-		const values = poly.getAttribute('points')
-			.trim()
-			.split(polyPointsSplitRE)
-			.map((q) => Number(q));
-		let points = new Array(values.length / 2)
+	const parsePolyPoints = (poly) => {
+		const value = poly.getAttribute('points');
+		const values = value ?
+			value.trim()
+				.split(polyPointsSplitRE)
+				.map((q) => Number(q)) :
+			[]
+		const points = new Array(values.length / 2)
 			.fill(0)
 			.map((_, i) => ({ x: values[i * 2], y: values[i * 2 + 1] }));
-		const pointsList = {
-			get length() {
-				return points.length;
+		const pointsList = Object.defineProperties(points, {
+			appendItem: {
+				value(point) {
+					return this.push(point);
+				},
+				enumerable: false
 			},
-			appendItem(point) {
-				return points.push(point);
+			clear: {
+				value() {
+					this.splice(0, this.length);
+				},
+				enumerable: false
 			},
-			clear() {
-				points = []
-			},
-			toString() {
-				return points.map(point => `${point.x},${point.y}`).join(' ');
+			toString: {
+				value() {
+					return this.map(point => `${point.x},${point.y}`).join(' ');
+				},
+				enumerable: false
 			}
-		}
+		});
 		return pointsList;
 	}
+
+	const polyfillSVGElement = (el) => {
+		if (el.tagName === "polyline" || el.tagName === "polygon") {
+		  el.points || Object.defineProperty(el, 'points', {
+			value: parsePolyPoints(el),
+			enumerable: false,
+			writable: false
+		  });
+		  el instanceof window.SVGPathElement ||
+			Object.setPrototypeOf(el, window.SVGPathElement.prototype);
+		} else if (el.tagName === "path") {
+		  el instanceof window.SVGPathElement ||
+			Object.setPrototypeOf(el, window.SVGPathElement.prototype);
+		}
+	};
 	
 	SvgParser.prototype.load = function(dirpath, svgString, scale, scalingFactor){
 	
@@ -89,14 +112,9 @@
 			// scale the svg so that our scale parameter is preserved
 			var root = svg.firstElementChild;
 			
+			svg.querySelectorAll('path, polygon, polyline').forEach(polyfillSVGElement);
+
 			this.svg = svg;
-			svg.querySelectorAll('path').forEach(path => path instanceof window.SVGPathElement || Object.setPrototypeOf(path, window.SVGPathElement.prototype))
-			svg.querySelectorAll('polygon, polyline').forEach(poly => {
-				const value = poly.getAttribute('points');
-				if (typeof value === 'string' && !poly.points) {
-					poly.points = this.parsePolyPoints(poly);
-				}
-			});
 			this.svgRoot = root;
 			
 			// get local scaling factor from svg root "width" dimension
@@ -1109,6 +1127,7 @@
 					var arc1 = path.createSVGPathSegArcAbs(parseFloat(element.getAttribute('cx'))+parseFloat(element.getAttribute('rx')),element.getAttribute('cy'),element.getAttribute('rx'),element.getAttribute('ry'),0,1,0);
 					var arc2 = path.createSVGPathSegArcAbs(parseFloat(element.getAttribute('cx'))-parseFloat(element.getAttribute('rx')),element.getAttribute('cy'),element.getAttribute('rx'),element.getAttribute('ry'),0,1,0);
 					
+					polyfillSVGElement(path);
 					const pathSegList = path.pathSegList || (path.pathSegList = new window.SVGPathSegList(path));
 					pathSegList.appendItem(move);
 					pathSegList.appendItem(arc1);
@@ -1223,6 +1242,7 @@
 					}
 					// similar to the ellipse, we'll replace rect with polygon
 					var polygon = this.svg.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+					polyfillSVGElement(polygon);
 					
 															
 					var p1 = { x: 0, y: 0 };
@@ -1599,7 +1619,7 @@
 		clean: parser.cleanInput.bind(parser),
 		polygonify: parser.polygonify.bind(parser),
 		polygonifyPath: parser.polygonifyPath.bind(parser),
-		parsePolyPoints: parser.parsePolyPoints,
+		polyfillSVGElement,
 		isClosed: parser.isClosed.bind(parser),
 		applyTransform: parser.applyTransform.bind(parser),
 		transformParse: parser.transformParse.bind(parser),

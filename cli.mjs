@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from "fs";
 import { ensureDir } from "fs-extra";
 import { lstat, readdir, readFile, writeFile } from "fs/promises";
 import path from "path";
-import { nest } from "./index.js";
+import { nest } from "./index.node.mjs";
 import ora from "ora";
 
 async function main(files, { bin, output, timeout = 60_000, config = {} }) {

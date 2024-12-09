@@ -4,7 +4,7 @@ import { readFile, writeFile } from "fs/promises";
 import { buffer } from "node:stream/consumers";
 import { parse } from "opentype.js";
 import { fileURLToPath } from "url";
-import { nest } from "./index.js";
+import { nest } from "./index.node.mjs";
 
 const app = express();
 const PORT = 8080;

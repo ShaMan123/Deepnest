@@ -1,13 +1,7 @@
-const { JSDOM } = require("jsdom");
-const { window } = new JSDOM();
-const { DOMParser, XMLSerializer, document } = window;
-
-Object.assign(global, { DOMParser, XMLSerializer, window, document });
-
-const { DeepNest } = require("./main/deepnest");
-const { Worker } = require("worker_threads");
-const path = require("path");
-const { nestingToSVG } = require("./nestingToSVG");
+import path from "path";
+import { Worker } from "worker_threads";
+import { DeepNest } from "./main/deepnest.js";
+import { nestingToSVG } from "./main/nestingToSVG.mjs";
 
 const eventEmitter = new EventTarget();
 
@@ -15,10 +9,10 @@ const eventEmitter = new EventTarget();
  *
  * @param {*} svgInput
  * @param {*} callback
- * @param {import("./index.d").NestingOptions} param2
+ * @param {import(".").NestingOptions} param2
  * @returns
  */
-async function nest(
+export async function nest(
   svgInput,
   callback,
   {
@@ -34,7 +28,7 @@ async function nest(
   // scale is stored in units/inch
   const ratio = units === "mm" ? 1 / 25.4 : 1;
   /**
-   * @type {import("./index.d").DeepNestConfig}
+   * @type {import(".").DeepNestConfig}
    */
   const deepNestConfig = {
     curveTolerance: 0.72, // store distances in native units
@@ -126,5 +120,3 @@ async function nest(
 
   return abort;
 }
-
-module.exports = { nest };

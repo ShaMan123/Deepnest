@@ -1,7 +1,7 @@
-const SvgParser = require("./main/svgparser");
+import SvgParser from "./svgparser.js";
 
 // Copied from `main/index.html`
-function nestingToSVG(
+export function nestingToSVG(
   deepNest,
   placementResult,
   title = "Nesting result",
@@ -114,5 +114,3 @@ function nestingToSVG(
 
   return new XMLSerializer().serializeToString(svg);
 }
-
-exports.nestingToSVG = nestingToSVG;

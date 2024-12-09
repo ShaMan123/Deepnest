@@ -105,6 +105,63 @@ const db = {
 
 const nfpcache = {};
 
+function writeToDB(processed, { parts, config }) {
+
+	function getPart(source){
+		for(var k=0; k<parts.length; k++){
+			if(parts[k].source == source){
+				return parts[k];
+			}
+		}
+		return null;
+	}
+
+	// store processed data in cache
+	for(var i=0; i<processed.length; i++){
+		// returned data only contains outer nfp, we have to account for any holes separately in the synchronous portion
+		// this is because the c++ addon which can process interior nfps cannot run in the worker thread					
+		var A = getPart(processed[i].Asource);
+		var B = getPart(processed[i].Bsource);
+							
+		var Achildren = [];
+		
+		var j;
+		if(A.children){
+			for(j=0; j<A.children.length; j++){
+				Achildren.push(rotatePolygon(A.children[j], processed[i].Arotation));
+			}
+		}
+		
+		if(Achildren.length > 0){
+			var Brotated = rotatePolygon(B, processed[i].Brotation);
+			var bbounds = GeometryUtil.getPolygonBounds(Brotated);
+			var cnfp = [];
+			
+			for(j=0; j<Achildren.length; j++){
+				var cbounds = GeometryUtil.getPolygonBounds(Achildren[j]);
+				if(cbounds.width > bbounds.width && cbounds.height > bbounds.height){
+					var n = getInnerNfp(Achildren[j], Brotated, config);
+					if(n && n.length > 0){
+						cnfp = cnfp.concat(n);
+					}
+				}
+			}
+			
+			processed[i].nfp.children = cnfp;
+		}
+		
+		var doc = {
+			A: processed[i].Asource,
+			B: processed[i].Bsource,
+			Arotation: processed[i].Arotation,
+			Brotation: processed[i].Brotation,
+			nfp: processed[i].nfp
+		};
+		db.insert(doc);
+		
+	}
+}
+
 /**
  * 2 threads are busy:
  * The main thread and the thread that executes this file
@@ -116,6 +173,13 @@ function processPairs(pairs, { index, signal, threadCount = availableThreads } =
 		parentPort.postMessage({ type: 'background-progress', data: { phase: 'NFP', index, progress: 0, threads: threadCount } });
 		const result = [];
 		const threads = new Set();
+		const terminate = () => {
+			const workers = Array.from(threads.values());
+			threads.clear();
+			workers.forEach(worker => worker.terminate())
+		}
+		signal?.addEventListener('abort', terminate);
+		parentPort.once('close', terminate);
 		const pairsPerWorker = Math.ceil(pairs.length / threadCount);
 		for (let i = 0; i < threadCount; i++) {
 			const start = pairsPerWorker * i;
@@ -126,6 +190,8 @@ function processPairs(pairs, { index, signal, threadCount = availableThreads } =
 			worker.on("exit", () => {
 				threads.delete(worker);
 				if (threads.size === 0) {
+					signal?.removeEventListener('abort', terminate);
+					parentPort.off('close', terminate);
 					result.length === pairs.length ? resolve(result) : reject(`Error while processing pairs, expected ${pairs.length} received ${result.length}`);
 				} 
 			});
@@ -135,157 +201,97 @@ function processPairs(pairs, { index, signal, threadCount = availableThreads } =
 			});
 			threads.add(worker);
 		}
-		const terminate = () => {
-			const workers = Array.from(threads.values());
-			threads.clear();
-			workers.forEach(worker => worker.terminate())
+	  });
+}
+
+function processMessage(data) {
+	var index = data.index;
+	var individual = data.individual;
+
+	var parts = individual.placement;
+	var rotations = individual.rotation;
+	var ids = data.ids;
+	var sources = data.sources;
+	var children = data.children;
+	var filenames = data.filenames;
+	
+	for(var i=0; i<parts.length; i++){
+		parts[i].rotation = rotations[i];
+		parts[i].id = ids[i];
+		parts[i].source = sources[i];
+		parts[i].filename = filenames[i];
+		if(!data.config.simplify){
+			parts[i].children = children[i];
 		}
-		signal?.addEventListener('abort', terminate);
-		parentPort.once('close', terminate);
-	  })
+	}
+	
+	for(i=0; i<data.sheets.length; i++){
+		data.sheets[i].id = data.sheetids[i];
+		data.sheets[i].source = data.sheetsources[i];
+		data.sheets[i].children = data.sheetchildren[i];
+	}
+	
+	// preprocess
+	var pairs = [];
+	var inpairs = function(key, p){
+		for(var i=0; i<p.length; i++){
+			if(p[i].Asource == key.Asource && p[i].Bsource == key.Bsource && p[i].Arotation == key.Arotation && p[i].Brotation == key.Brotation){
+				return true;
+			}
+		}
+		return false;
+	}
+	for(var i=0; i<parts.length; i++){
+		var B = parts[i];
+		for(var j=0; j<i; j++){
+			var A = parts[j];
+			var key = {
+				A: A,
+				B: B,
+				Arotation: A.rotation,
+				Brotation: B.rotation,
+				Asource: A.source,
+				Bsource: B.source
+			};
+			var doc = {
+				A: A.source,
+				B: B.source,
+				Arotation: A.rotation,
+				Brotation: B.rotation
+			}
+			if(!inpairs(key, pairs) && !db.has(doc)){
+				pairs.push(key);
+			}
+		}
+	}
+	
+	return {
+		index,
+		parts,
+		pairs,
+		sheets: data.sheets,
+		config: data.config,
+	}
 }
 
 function attach() {  
-	parentPort.on('message', (data) => {
-		var index = data.index;
-	    var individual = data.individual;
+	parentPort.on('message', async (payload) => {
+		const { index, parts, pairs, sheets, config } = processMessage(payload);
 
-	    var parts = individual.placement;
-		var rotations = individual.rotation;
-		var ids = data.ids;
-		var sources = data.sources;
-		var children = data.children;
-		var filenames = data.filenames;
+		// console.log('pairs: ',pairs.length);		  
 		
-		for(var i=0; i<parts.length; i++){
-			parts[i].rotation = rotations[i];
-			parts[i].id = ids[i];
-			parts[i].source = sources[i];
-			parts[i].filename = filenames[i];
-			if(!data.config.simplify){
-				parts[i].children = children[i];
-			}
+		if (pairs.length > 0) {
+			// console.time('Total');
+			const processed = await processPairs(pairs, { index });
+			writeToDB(processed, { parts, config });
+			// console.timeEnd('Total');
+			// console.log('before sync');
 		}
-		
-		for(i=0; i<data.sheets.length; i++){
-			data.sheets[i].id = data.sheetids[i];
-			data.sheets[i].source = data.sheetsources[i];
-			data.sheets[i].children = data.sheetchildren[i];
-		}
-		
-		// preprocess
-		var pairs = [];
-		var inpairs = function(key, p){
-			for(var i=0; i<p.length; i++){
-				if(p[i].Asource == key.Asource && p[i].Bsource == key.Bsource && p[i].Arotation == key.Arotation && p[i].Brotation == key.Brotation){
-					return true;
-				}
-			}
-			return false;
-		}
-		for(var i=0; i<parts.length; i++){
-			var B = parts[i];
-			for(var j=0; j<i; j++){
-				var A = parts[j];
-				var key = {
-					A: A,
-					B: B,
-					Arotation: A.rotation,
-					Brotation: B.rotation,
-					Asource: A.source,
-					Bsource: B.source
-				};
-				var doc = {
-					A: A.source,
-					B: B.source,
-					Arotation: A.rotation,
-					Brotation: B.rotation
-				}
-				if(!inpairs(key, pairs) && !db.has(doc)){
-					pairs.push(key);
-				}
-			}
-		}
-		
-		// console.log('pairs: ',pairs.length);
 		  
-		  // run the placement synchronously
-		  function sync(){
-		  	//console.log('starting synchronous calculations', Object.keys(window.nfpCache).length);
-		  	// console.log('in sync');
-
-		  	var placement = placeParts(data.sheets, parts, data.config, index);
-	
-			placement.index = data.index;
-			parentPort.postMessage({ type: 'background-response', data: placement });
-		  }
-		  
-		//   console.time('Total');
-		  
-		  
-		  if(pairs.length > 0){
-			return processPairs(pairs, { index })
-				.then(function(processed){
-			  	 function getPart(source){
-					for(var k=0; k<parts.length; k++){
-						if(parts[k].source == source){
-							return parts[k];
-						}
-					}
-					return null;
-				  }
-				// store processed data in cache
-				for(var i=0; i<processed.length; i++){
-					// returned data only contains outer nfp, we have to account for any holes separately in the synchronous portion
-					// this is because the c++ addon which can process interior nfps cannot run in the worker thread					
-					var A = getPart(processed[i].Asource);
-					var B = getPart(processed[i].Bsource);
-										
-					var Achildren = [];
-					
-					var j;
-					if(A.children){
-						for(j=0; j<A.children.length; j++){
-							Achildren.push(rotatePolygon(A.children[j], processed[i].Arotation));
-						}
-					}
-					
-					if(Achildren.length > 0){
-						var Brotated = rotatePolygon(B, processed[i].Brotation);
-						var bbounds = GeometryUtil.getPolygonBounds(Brotated);
-						var cnfp = [];
-						
-						for(j=0; j<Achildren.length; j++){
-							var cbounds = GeometryUtil.getPolygonBounds(Achildren[j]);
-							if(cbounds.width > bbounds.width && cbounds.height > bbounds.height){
-								var n = getInnerNfp(Achildren[j], Brotated, data.config);
-								if(n && n.length > 0){
-									cnfp = cnfp.concat(n);
-								}
-							}
-						}
-						
-						processed[i].nfp.children = cnfp;
-					}
-					
-					var doc = {
-						A: processed[i].Asource,
-						B: processed[i].Bsource,
-						Arotation: processed[i].Arotation,
-						Brotation: processed[i].Brotation,
-						nfp: processed[i].nfp
-					};
-					db.insert(doc);
-					
-				}
-				// console.timeEnd('Total');
-				// console.log('before sync');
-				sync();
-			  });
-		  }
-		  else{
-		  	sync();
-		  }
+		// run the placement synchronously
+		//console.log('starting synchronous calculations', Object.keys(window.nfpCache).length);
+		const placement = placeParts({ index, parts, sheets, config });
+		parentPort.postMessage({ type: 'background-response', data: placement });
 	});
 };
 
@@ -743,7 +749,7 @@ function getInnerNfp(A, B, config){
 	return f;
 }
 
-function placeParts(sheets, parts, config, nestindex){
+function placeParts({ sheets, parts, config, index: nestindex }){
 
 	if(!sheets){
 		return null;
@@ -1120,7 +1126,7 @@ function placeParts(sheets, parts, config, nestindex){
 
 	// console.log('WATCH', allplacements);
 	
-	return {placements: allplacements, fitness: fitness, area: sheetarea, mergedLength: totalMerged };
+	return {placements: allplacements, fitness: fitness, area: sheetarea, mergedLength: totalMerged, index: nestindex };
 }
 
 // clipperjs uses alerts for warnings

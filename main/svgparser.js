@@ -1244,11 +1244,12 @@
 					var polygon = this.svg.createElementNS('http://www.w3.org/2000/svg', 'polygon');
 					polyfillSVGElement(polygon);
 					
-															
-					var p1 = { x: 0, y: 0 };
-					var p2 = { x: 0, y: 0 };
-					var p3 = { x: 0, y: 0 };
-					var p4 = { x: 0, y: 0 };
+							
+					const createSVGPoint = this.svgRoot.createSVGPoint || (() => ({ x: 0, y: 0 }));
+					var p1 = createSVGPoint();
+					var p2 = createSVGPoint();
+					var p3 = createSVGPoint();
+					var p4 = createSVGPoint();
 					
 					p1.x = parseFloat(element.getAttribute('x')) || 0;
 					p1.y = parseFloat(element.getAttribute('y')) || 0;

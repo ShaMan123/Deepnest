@@ -129,22 +129,21 @@ async function nest(
   svgInput,
   callback,
   {
-    units = "mm",
-    scale = 72,
-    spacing = 4,
-    sheet = { width: 3000, height: 1000 },
+    container,
     timeout = 0,
     progressCallback,
+    units = "inch",
+    scale = 72,
+    spacing = 0,
     ...config
-  } = {}
+  }
 ) {
   // scale is stored in units/inch
   const ratio = units === "mm" ? 1 / 25.4 : 1;
+  /**
+   * @type {import("./index.d").DeepNestConfig}
+   */
   const deepNestConfig = {
-    ...config,
-    units,
-    scale,
-    spacing: spacing * ratio * scale, // stored value will be in units/inch
     curveTolerance: 0.72, // store distances in native units
     clipperScale: 10000000,
     rotations: 4,
@@ -159,6 +158,10 @@ async function nest(
     dxfExportScale: 72,
     endpointTolerance: 0.36,
     conversionServer: "http://convert.deepnest.io",
+    ...config,
+    units,
+    scale,
+    spacing: spacing * ratio * scale, // stored value will be in units/inch
   };
   const deepNest = new DeepNest(eventEmitter, deepNestConfig);
   const worker = new Worker(path.resolve("./main/background.js"));
@@ -171,9 +174,11 @@ async function nest(
   const [sheetSVG] = deepNest.importsvg(
     null,
     null,
-    `<svg xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="${
-      sheet.width * ratio * scale
-    }" height="${sheet.height * ratio * scale}" class="sheet"/></svg>`
+    typeof container === "object"
+      ? `<svg xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="${
+          container.width * ratio * scale
+        }" height="${container.height * ratio * scale}" class="sheet"/></svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg">${container}</svg>`
   );
   sheetSVG.sheet = true;
   const elements = svgInput
@@ -192,7 +197,7 @@ async function nest(
   }
 
   eventEmitter.addEventListener("background-progress", ({ detail }) => {
-    detail.progress >= 0 && progressCallback(detail);
+    detail.progress >= 0 && progressCallback?.(detail);
   });
 
   let t = 0;

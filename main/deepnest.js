@@ -1108,7 +1108,7 @@
 			}
 			
 			if(finished){
-				console.log('new generation!');
+				eventEmitter.dispatchEvent(new CustomEvent('new-generation'));
 				// all individuals have been evaluated, start next generation
 				GA.generation();
 			}

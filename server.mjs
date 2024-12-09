@@ -48,7 +48,12 @@ async function nestSSE(req, res) {
         );
       },
       {
-        progressCallback: ({ index, progress, phase }) => {
+        container: { width: 3000, height: 1000 },
+        // optimize material usage
+        timeRatio: 0,
+        units: "mm",
+        spacing: 4,
+        progressCallback: ({ progress, phase }) => {
           res.write("event: progress\n");
           res.write(
             `data: ${JSON.stringify({
@@ -299,7 +304,10 @@ async function start() {
     console.log("Server listening on PORT", PORT);
   });
 
-  process.once("SIGINT", () => server.close());
+  process.once("SIGINT", () => {
+    server.close();
+    process.exit();
+  });
 }
 
 start();

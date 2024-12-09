@@ -125,11 +125,18 @@ function nestingToSVG(
   return new XMLSerializer().serializeToString(svg);
 }
 
+/**
+ *
+ * @param {*} svgInput
+ * @param {*} callback
+ * @param {import("./index.d").NestingOptions} param2
+ * @returns
+ */
 async function nest(
   svgInput,
   callback,
   {
-    container,
+    bin,
     timeout = 0,
     progressCallback,
     units = "inch",
@@ -174,11 +181,11 @@ async function nest(
   const [sheetSVG] = deepNest.importsvg(
     null,
     null,
-    typeof container === "object"
+    typeof bin === "object"
       ? `<svg xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="${
-          container.width * ratio * scale
-        }" height="${container.height * ratio * scale}" class="sheet"/></svg>`
-      : `<svg xmlns="http://www.w3.org/2000/svg">${container}</svg>`
+          bin.width * ratio * scale
+        }" height="${bin.height * ratio * scale}" class="sheet"/></svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg">${bin}</svg>`
   );
   sheetSVG.sheet = true;
   const elements = svgInput

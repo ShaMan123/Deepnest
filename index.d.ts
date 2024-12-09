@@ -44,7 +44,7 @@ type DeepNestConfig = {
 };
 
 type NestingOptions = Partial<DeepNestConfig> & {
-  container: { width: number; height: number } | string;
+  bin: { width: number; height: number } | string;
   timeout?: number;
   progressCallback?: (data: {
     phase: string;

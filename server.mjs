@@ -48,7 +48,7 @@ async function nestSSE(req, res) {
         );
       },
       {
-        container: { width: 3000, height: 1000 },
+        bin: { width: 3000, height: 1000 },
         // optimize material usage
         timeRatio: 0,
         units: "mm",

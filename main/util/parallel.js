@@ -1,10 +1,12 @@
 ﻿(function () {
-	var isCommonJS = typeof module !== 'undefined' && module.exports;
-	var isNode = !(typeof window !== 'undefined' && this === window);
+	//var isCommonJS = typeof module !== 'undefined' && module.exports;
+	//var isNode = !(typeof window !== 'undefined' && this === window);
+	var isCommonJS = false;
+	var isNode = false;
 	var setImmediate = setImmediate || function (cb) {
 		setTimeout(cb, 0);
 	};
-	var Worker = isNode ? require('worker_threads').Worker : self.Worker;
+	var Worker = isNode ? require(__dirname + '/Worker.js') : self.Worker;
 	var URL = typeof self !== 'undefined' ? (self.URL ? self.URL : self.webkitURL) : null;
 	var _supports = (isNode || self.Worker) ? true : false; // node always supports parallel
 

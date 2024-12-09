@@ -45,8 +45,16 @@ npm install
 
 ### Node
 
+Remove the electron app bindings because they cause issues (`ERR_DLOPEN_FAILED`) with the node app bindings
+
 ```sh
-rm -r minkowski # Remove the electron app bindings because they cause issues (`ERR_DLOPEN_FAILED`) with the node app bindings
+rm -r minkowski # Remove the electron app bindings
+npm i # Reset node bindings
+```
+
+#### Run
+
+```sh
 npm run serve # run http server
 node cli.mjs # run cli
 ```

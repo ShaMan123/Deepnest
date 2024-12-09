@@ -301,7 +301,7 @@ async function start() {
   await writeFile("./fonts", JSON.stringify(fonts, null, 2));
 
   const server = app.listen(PORT, () => {
-    console.log("Server listening on PORT", PORT);
+    console.log("Server listening on", `http://localhost:${PORT}`);
   });
 
   process.once("SIGINT", () => {

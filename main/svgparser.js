@@ -43,6 +43,7 @@
 	const polyPointsSplitRE = /\s+|,/
 	SvgParser.prototype.parsePolyPoints = (poly) => {
 		const values = poly.getAttribute('points')
+			.trim()
 			.split(polyPointsSplitRE)
 			.map((q) => Number(q));
 		let points = new Array(values.length / 2)
@@ -92,7 +93,7 @@
 			svg.querySelectorAll('path').forEach(path => path instanceof window.SVGPathElement || Object.setPrototypeOf(path, window.SVGPathElement.prototype))
 			svg.querySelectorAll('polygon, polyline').forEach(poly => {
 				const value = poly.getAttribute('points');
-				if (typeof value === 'string') {
+				if (typeof value === 'string' && !poly.points) {
 					poly.points = this.parsePolyPoints(poly);
 				}
 			});

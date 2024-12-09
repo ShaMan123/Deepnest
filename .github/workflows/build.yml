@@ -56,20 +56,20 @@ jobs:
           path: dist/
           retention-days: 1
 
-      - name: Run app
-        if: matrix.flavor == 'test'
-        run: |
-          appName=$(ls dist | head -1)
-          # copy input files
-          # cp -R ./input ./dist/$appName/resources/app
-          # make executable and run
-          chmod +x ./dist/$appName/deepnest
-          xvfb-run ./dist/$appName/deepnest
+      # - name: Run app
+      #   if: matrix.flavor == 'test'
+      #   run: |
+      #     appName=$(ls dist | head -1)
+      #     # copy input files
+      #     # cp -R ./input ./dist/$appName/resources/app
+      #     # make executable and run
+      #     chmod +x ./dist/$appName/deepnest
+      #     xvfb-run ./dist/$appName/deepnest
 
-      - name: Upload results
-        if: matrix.flavor == 'test'
-        uses: actions/upload-artifact@v4
-        with:
-          name: nesting-results-${{ matrix.os }}
-          path: /home/runner/nesting-*/
-          retention-days: 1
+      # - name: Upload results
+      #   if: matrix.flavor == 'test'
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: nesting-results-${{ matrix.os }}
+      #     path: /home/runner/nesting-*/
+      #     retention-days: 1

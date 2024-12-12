@@ -8,26 +8,7 @@ import { OpenDialogReturnValue } from "electron";
 import { readdir, readFile } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
-
-type NestingResult = {
-  area: number;
-  fitness: number;
-  index: number;
-  mergedLength: number;
-  selected: boolean;
-  placements: {
-    sheet: number;
-    sheetid: number;
-    sheetplacements: {
-      filename: string;
-      id: number;
-      rotation: number;
-      source: number;
-      x: number;
-      y: number;
-    }[];
-  }[];
-};
+import { DeepNestConfig, NestingResult } from "../index";
 
 // test.use({ launchOptions: { slowMo: !process.env.CI ? 500 : 0 } });
 
@@ -61,27 +42,7 @@ test("Nest", async ({}, testInfo) => {
   // electronApp.on("window", (win) => win.on("console", logMessage));
 
   await test.step("upload and start", async () => {
-    // electronApp.evaluate(
-    //   (q, { upload, download }) => {
-    //     console.log(q);
-    //     q.contextBridge.exposeInMainWorld("electron", {
-    //       showOpenDialog: async (): Promise<OpenDialogReturnValue> => ({
-    //         filePaths: upload,
-    //         canceled: false,
-    //       }),
-    //       showSaveDialogSync: () => download,
-    //     });
-    //   },
-    //   {
-    //     upload: [
-    //       path.resolve(process.cwd(), "input", "letters.svg"),
-    //       path.resolve(process.cwd(), "input", "letters2.svg"),
-    //     ],
-    //     download: downloadPath,
-    //   }
-    // );
-
-    const inputDir = path.resolve(process.cwd(), "input");
+    const inputDir = path.resolve(__dirname, "assets");
     const files = (await readdir(inputDir))
       .filter((file) => path.extname(file) === ".svg")
       .map((file) => path.resolve(inputDir, file));
@@ -101,7 +62,7 @@ test("Nest", async ({}, testInfo) => {
 
     const spacingMM = 10;
     const scale = 72;
-    const config = {
+    const config: DeepNestConfig = {
       units: "mm",
       scale, // stored value will be in units/inch
       spacing: (spacingMM / 25.4) * scale, // stored value will be in units/inch
@@ -115,8 +76,8 @@ test("Nest", async ({}, testInfo) => {
       mergeLines: true, // whether to merge lines
       timeRatio: 0.5, // ratio of material reduction to laser time. 0 = optimize material only, 1 = optimize laser time only
       simplify: false,
-      dxfImportScale: "1",
-      dxfExportScale: "72",
+      dxfImportScale: 1,
+      dxfExportScale: 72,
       endpointTolerance: 0.36,
       conversionServer: "http://convert.deepnest.io",
     };

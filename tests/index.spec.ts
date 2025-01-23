@@ -1,42 +1,21 @@
 import {
-  type ConsoleMessage,
+  ConsoleMessage,
   _electron as electron,
   expect,
   test,
 } from "@playwright/test";
 import { OpenDialogReturnValue } from "electron";
-import { readdir, readFile } from "fs/promises";
+import { existsSync } from "node:fs";
+import { appendFile, mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import path from "path";
-import { fileURLToPath } from "url";
+import { NestingResult } from "../index";
 
-type NestingResult = {
-  area: number;
-  fitness: number;
-  index: number;
-  mergedLength: number;
-  selected: boolean;
-  placements: {
-    sheet: number;
-    sheetid: number;
-    sheetplacements: {
-      filename: string;
-      id: number;
-      rotation: number;
-      source: number;
-      x: number;
-      y: number;
-    }[];
-  }[];
-};
-
-// test.use({ launchOptions: { slowMo: !process.env.CI ? 500 : 0 } });
-
-// test.setTimeout(5 * 60_000);
-// !process.env.CI && test.use({ launchOptions: { slowMo: 2000 } });
-
-const sheet = { width: 3000, height: 1000 };
+// !process.env.CI && test.use({ launchOptions: { slowMo: 500 } });
 
 test("Nest", async ({}, testInfo) => {
+  const { pipeConsole } = testInfo.config.metadata;
+
   const electronApp = await electron.launch({
     args: ["main.js"],
     recordVideo: { dir: testInfo.outputDir },
@@ -44,48 +23,100 @@ test("Nest", async ({}, testInfo) => {
 
   const window = await electronApp.firstWindow();
 
-  // Direct Electron console to Node terminal.
-  const logMessage = async (message: ConsoleMessage) => {
-    const { url, lineNumber, columnNumber } = message.location();
-    let file = url;
-    try {
-      file = path.relative(process.cwd(), fileURLToPath(url));
-    } catch (error) {}
-    console.log({
-      location: `${file}:${lineNumber}:${columnNumber}`,
-      args: await Promise.all(message.args().map((x) => x.jsonValue())),
-      type: message.type(),
+  const consoleDump = testInfo.outputPath("console.txt");
+  pipeConsole &&
+    test.step(
+      "Pipe browser console logs",
+      () => {
+        existsSync(testInfo.outputDir) &&
+          mkdir(testInfo.outputDir, { recursive: true });
+        const logMessage = async (message: ConsoleMessage) => {
+          await test.step(
+            "Log message",
+            async () => {
+              const { url, lineNumber, columnNumber } = message.location();
+              let file = url;
+              try {
+                file = path.relative(process.cwd(), fileURLToPath(url));
+              } catch (error) {}
+              await appendFile(
+                consoleDump,
+                JSON.stringify(
+                  {
+                    location: `${file}:${lineNumber}:${columnNumber}`,
+                    args: await Promise.all(
+                      message.args().map((x) => x.jsonValue())
+                    ),
+                    type: message.type(),
+                  },
+                  null,
+                  2
+                ) + ",\n\n"
+              );
+            },
+            { box: true }
+          );
+        };
+
+        window.on("console", logMessage);
+        electronApp.on("window", (win) => win.on("console", logMessage));
+      },
+      { box: true }
+    );
+
+  await test.step("Config", async () => {
+    await window.locator("#config_tab").click();
+    const configTab = window.getByText("Nesting configuration Display");
+    await configTab.getByRole("link", { name: "set all to default" }).click();
+    await test.step("units mm", () =>
+      configTab.getByRole("radio").nth(1).check());
+    await test.step("spacing 10mm", async () => {
+      await configTab.getByRole("spinbutton").first().fill("10");
+      await configTab.getByRole("spinbutton").first().blur();
     });
-  };
-  // window.on("console", logMessage);
-  // electronApp.on("window", (win) => win.on("console", logMessage));
+    await test.step("placement type gravity", () =>
+      configTab
+        .locator('select[name="placementType"]')
+        .selectOption("gravity"));
+    const config = await window.evaluate(() => {
+      return window.config.getSync();
+    });
+    const deepNestConfig = await window.evaluate(() => {
+      return window.DeepNest.config();
+    });
+    const sharedConfig = {
+      curveTolerance: 0.72,
+      mergeLines: true,
+      mutationRate: 10,
+      placementType: "gravity",
+      populationSize: 10,
+      rotations: 4,
+      scale: 72,
+      simplify: false,
+      spacing: 28.34645669291339,
+      threads: 4,
+      timeRatio: 0.5,
+    };
+    expect(config).toMatchObject({
+      ...sharedConfig,
+      conversionServer: "http://convert.deepnest.io",
+      dxfExportScale: "72",
+      dxfImportScale: "1",
+      endpointTolerance: 0.36,
+      units: "mm",
+    });
+    expect(deepNestConfig).toMatchObject({
+      ...sharedConfig,
+      clipperScale: 10000000,
+    });
+    await window.locator("#home_tab").click();
+  });
 
-  await test.step("upload and start", async () => {
-    // electronApp.evaluate(
-    //   (q, { upload, download }) => {
-    //     console.log(q);
-    //     q.contextBridge.exposeInMainWorld("electron", {
-    //       showOpenDialog: async (): Promise<OpenDialogReturnValue> => ({
-    //         filePaths: upload,
-    //         canceled: false,
-    //       }),
-    //       showSaveDialogSync: () => download,
-    //     });
-    //   },
-    //   {
-    //     upload: [
-    //       path.resolve(process.cwd(), "input", "letters.svg"),
-    //       path.resolve(process.cwd(), "input", "letters2.svg"),
-    //     ],
-    //     download: downloadPath,
-    //   }
-    // );
-
-    const inputDir = path.resolve(process.cwd(), "input");
+  await test.step("Upload files", async () => {
+    const inputDir = path.resolve(__dirname, "assets");
     const files = (await readdir(inputDir))
       .filter((file) => path.extname(file) === ".svg")
       .map((file) => path.resolve(inputDir, file));
-
     await electronApp.evaluate(({ dialog }, paths) => {
       dialog.showOpenDialog = async (): Promise<OpenDialogReturnValue> => ({
         filePaths: paths,
@@ -93,109 +124,92 @@ test("Nest", async ({}, testInfo) => {
       });
     }, files);
     await window.click("id=import");
+    await expect(window.locator("#importsnav li")).toHaveCount(2);
+  });
 
+  await test.step("Add sheet", async () => {
+    const sheet = { width: 300, height: 200 };
     await window.click("id=addsheet");
     await window.fill("id=sheetwidth", sheet.width.toString());
     await window.fill("id=sheetheight", sheet.height.toString());
     await window.click("id=confirmsheet");
-
-    const spacingMM = 10;
-    const scale = 72;
-    const config = {
-      units: "mm",
-      scale, // stored value will be in units/inch
-      spacing: (spacingMM / 25.4) * scale, // stored value will be in units/inch
-      curveTolerance: 0.72, // store distances in native units
-      clipperScale: 10000000,
-      rotations: 4,
-      threads: 4,
-      populationSize: 10,
-      mutationRate: 10,
-      placementType: "gravity", // how to place each part (possible values gravity, box, convexhull)
-      mergeLines: true, // whether to merge lines
-      timeRatio: 0.5, // ratio of material reduction to laser time. 0 = optimize material only, 1 = optimize laser time only
-      simplify: false,
-      dxfImportScale: "1",
-      dxfExportScale: "72",
-      endpointTolerance: 0.36,
-      conversionServer: "http://convert.deepnest.io",
-    };
-
-    await window.evaluate((config) => {
-      window.config.setSync(config);
-      window.DeepNest.config(config);
-    }, config);
-
-    // await expect(window).toHaveScreenshot("loaded.png", {
-    //   clip: { x: 100, y: 100, width: 2000, height: 1000 },
-    // });
-
-    await window.click("id=startnest");
   });
 
-  const stopNesting = () => window.click("id=stopnest");
-
-  const downloadSvg = async () => {
-    const file = testInfo.outputPath("output.svg");
-    electronApp.evaluate(({ dialog }, path) => {
-      dialog.showSaveDialogSync = () => path;
-    }, file);
-    await window.click("id=export");
-    await expect(window.locator("id=exportsvg")).toBeVisible();
-    await window.click("id=exportsvg");
-    return (await readFile(file)).toString();
-  };
-
-  // await electronApp.evaluate(({ ipcRenderer }) => {
-  //   ipcRenderer.on("placement", (event, payload) =>
-  //     console.log("INCOMING", payload)
-  //   );
+  // await expect(window).toHaveScreenshot("loaded.png", {
+  //   clip: { x: 100, y: 100, width: 2000, height: 1000 },
   // });
+  await window.click("id=startnest");
 
-  // const waitForIteration = (n: number) =>
-  //   expect(() =>
-  //     expect(
-  //       window
-  //         .locator("id=nestlist")
-  //         .locator("span")
-  //         .nth(n - 1)
-  //     ).toBeVisible()
-  //   ).toPass();
+  const stopNesting = () =>
+    test.step("Stop nesting", async () => {
+      const button = window.locator("#stopnest");
+      await button.click();
+      await expect(() => expect(button).toHaveText("Start nest")).toPass();
+    });
 
-  // await window.pause();
+  const downloadSvg = () =>
+    test.step("Download SVG", async () => {
+      const file = testInfo.outputPath("output.svg");
+      electronApp.evaluate(({ dialog }, path) => {
+        dialog.showSaveDialogSync = () => path;
+      }, file);
+      await window.click("id=export");
+      await expect(window.locator("id=exportsvg")).toBeVisible();
+      await window.click("id=exportsvg");
+      return (await readFile(file)).toString();
+    });
 
-  // await expect(window.locator("id=progressbar")).toBeVisible();
-  const n = 1;
-  await expect(() =>
-    expect(
-      window
-        .locator("id=nestlist")
-        .locator("span")
-        .nth(n - 1)
-    ).toBeVisible()
-  ).toPass();
+  const waitForIteration = (n: number) =>
+    test.step(`Wait for iteration #${n}`, () =>
+      expect(() =>
+        expect(
+          window
+            .locator("id=nestlist")
+            .locator("span")
+            .nth(n - 1)
+        ).toBeVisible()
+      ).toPass());
+
+  await expect(window.locator("id=progressbar")).toBeVisible();
+  await waitForIteration(1);
   await expect(window.locator("id=nestinfo").locator("h1").nth(0)).toHaveText(
     "1"
   );
-  // await expect(window.locator("id=nestinfo").locator("h1").nth(1)).toHaveText(
-  //   "54/54"
-  // );
+  await expect(window.locator("id=nestinfo").locator("h1").nth(1)).toHaveText(
+    "54/54"
+  );
 
-  const svg = await downloadSvg();
+  await test.step("Attachments", async () => {
+    const svg = await downloadSvg();
+    const data = (): Promise<NestingResult> =>
+      window.evaluate(() => window.DeepNest.nests);
 
-  const data = (): Promise<NestingResult> =>
-    window.evaluate(() => window.DeepNest.nests);
-
-  testInfo.attach("nesting.svg", { body: svg, contentType: "image/svg+xml" });
-
-  testInfo.attach("nesting.json", {
-    body: JSON.stringify(await data(), null, 2),
-    contentType: "application/json",
+    await testInfo.attach("nesting.svg", {
+      body: svg,
+      contentType: "image/svg+xml",
+    });
+    await testInfo.attach("nesting.json", {
+      body: JSON.stringify(await data(), null, 2),
+      contentType: "application/json",
+    });
+    existsSync(consoleDump) &&
+      (await testInfo.attach("console.json", {
+        body: JSON.stringify(
+          (
+            await readFile(consoleDump)
+          )
+            .toString()
+            .split(",\n\n")
+            .filter((x) => !!x)
+            .map((x) => JSON.parse(x)),
+          null,
+          2
+        ),
+        contentType: "application/json",
+      }));
   });
 
   await stopNesting();
-
-  await electronApp.close();
 });
 
 test.afterAll(async ({}, testInfo) => {

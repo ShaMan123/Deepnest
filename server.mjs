@@ -113,8 +113,13 @@ function subscribeToSeverEvents(endPoint, data) {
     if (!status.better) {
       return;
     }
-    stats.innerHTML = `${status.placed}/${status.total}`;
     container.innerHTML = svg;
+    const { width, height } = container
+      .querySelector("svg > g")
+      .getBoundingClientRect();
+    stats.innerHTML = `${status.placed}/${status.total} taking ${Math.ceil(
+      width
+    )}*${Math.ceil(height)}px = ${Math.ceil(width * height)}px`;
     json.innerHTML = JSON.stringify(data, null, 2);
   });
   evtSource.addEventListener("error", () => {

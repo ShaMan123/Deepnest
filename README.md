@@ -13,7 +13,7 @@ Deepnest is a node application originally based on [SVGNest](https://github.com/
 
 ## Fork History
 
-This repo was forked from [deepnest-io](https://github.com/deepnest-io/Deepnest) in order to make Deepnest work on node, decoupled from the electron app.
+This repo was forked from [deepnest-io](https://github.com/deepnest-io/Deepnest) in order to make Deepnest work on node, decoupled from the electron app, refer to the [example](server.mjs).
 
 ## Prerequisites
 
